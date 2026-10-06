@@ -587,6 +587,17 @@ export function healthRunIsStale(
   return nowMs - ran > STALE_MS;
 }
 
+/** زرد: اجرا نشده یا کهنه. قرمز: آخرین اجرا حداقل یک مشکل دارد. */
+export function dashboardHealthAlerts(
+  report: HealthReport | null,
+  nowMs = Date.now(),
+): { yellow: boolean; red: boolean } {
+  return {
+    yellow: healthRunIsStale(report, nowMs),
+    red: Boolean(report?.checks.some((check) => check.count > 0)),
+  };
+}
+
 export function formatTehranDateTime(value: string | Date): string {
   const date = typeof value === "string" ? new Date(value) : value;
   return new Intl.DateTimeFormat("fa-IR", {

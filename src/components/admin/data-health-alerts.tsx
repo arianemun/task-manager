@@ -1,19 +1,19 @@
 import Link from "next/link";
 import type { HealthReport } from "@/lib/health/db-check";
 import {
+  dashboardHealthAlerts,
   formatTehranDateTime,
-  healthRunIsStale,
 } from "@/lib/health/db-check";
 import { toFaDigits } from "@/lib/utils";
 
 export function DataHealthAlerts({ report }: { report: HealthReport | null }) {
+  const alerts = dashboardHealthAlerts(report);
   const problems = report?.checks.filter((check) => check.count > 0) ?? [];
-  const stale = healthRunIsStale(report);
-  if (problems.length === 0 && !stale) return null;
+  if (!alerts.yellow && !alerts.red) return null;
 
   return (
     <div className="space-y-3">
-      {problems.length > 0 && report ? (
+      {alerts.red && report ? (
         <div
           role="alert"
           className="border-destructive/40 bg-destructive/10 text-destructive space-y-2 rounded-lg border px-4 py-3 text-sm leading-[1.7]"
@@ -35,7 +35,7 @@ export function DataHealthAlerts({ report }: { report: HealthReport | null }) {
           </Link>
         </div>
       ) : null}
-      {stale ? (
+      {alerts.yellow ? (
         <div
           role="alert"
           className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm leading-[1.7] text-amber-950 dark:text-amber-100"
