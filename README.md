@@ -143,19 +143,28 @@ cp .cron.env.example .cron.env
 
 ```bash
 bash /www/wwwroot/task-manager/scripts/cron/generate.sh
+bash /www/wwwroot/task-manager/scripts/cron/close-periods.sh
 bash /www/wwwroot/task-manager/scripts/cron/backup.sh
 bash /www/wwwroot/task-manager/scripts/cron/db-check.sh
-bash /www/wwwroot/task-manager/scripts/cron/close-periods.sh
 ```
 
 زمان‌بندی به وقت تهران:
 
-| کار | زمان | خط aaPanel |
+| کار | زمان | خط |
 |---|---|---|
 | generate | ۰۰:۰۵ | `bash /www/wwwroot/task-manager/scripts/cron/generate.sh` |
+| close-periods | ۰۰:۱۵ | `bash /www/wwwroot/task-manager/scripts/cron/close-periods.sh` |
 | backup | ۰۲:۰۰ | `bash /www/wwwroot/task-manager/scripts/cron/backup.sh` |
 | db-check | ۰۲:۲۵ | `bash /www/wwwroot/task-manager/scripts/cron/db-check.sh` |
-| close-periods | ۲۳:۵۵ | `bash /www/wwwroot/task-manager/scripts/cron/close-periods.sh` |
+
+نصب یا به‌روزرسانی همین چهار خط در crontab کاربر `www`، داخل بلوک `# BEGIN task-manager` تا `# END task-manager`:
+
+```bash
+sudo bash /www/wwwroot/task-manager/scripts/cron/install.sh
+crontab -u www -l
+```
+
+`close-periods` ساعت ۰۰:۱۵ است تا کارهای دیروز کمی بعد از نیمه‌شب بسته شوند. قفل پاسخ پرسنل به این ساعت وابسته نیست: بعد از `period_end` ثبت مسدود است، حتی اگر وضعیت هنوز `PENDING` باشد و Cron اجرا نشده باشد. `due_at` فقط `DONE` را از `DONE_LATE` جدا می‌کند و تا پایان همان دوره ثبت را باز می‌گذارد.
 
 ساعت‌های بالا وقتی درست‌اند که timezone سیستم `Asia/Tehran` باشد. aaPanel همان ساعت سیستم را برای Cron استفاده می‌کند. بررسی:
 
@@ -173,10 +182,10 @@ sudo timedatectl set-timezone Asia/Tehran
 
 | کار تهران | معادل UTC |
 |---|---|
-| ۰۰:۰۵ | ۲۰:۳۵ روز قبل |
-| ۰۲:۰۰ | ۲۲:۳۰ روز قبل |
-| ۰۲:۲۵ | ۲۲:۵۵ روز قبل |
-| ۲۳:۵۵ | ۲۰:۲۵ همان روز |
+| ۰۰:۰۵ generate | ۲۰:۳۵ روز قبل |
+| ۰۰:۱۵ close-periods | ۲۰:۴۵ روز قبل |
+| ۰۲:۰۰ backup | ۲۲:۳۰ روز قبل |
+| ۰۲:۲۵ db-check | ۲۲:۵۵ روز قبل |
 
 مهر زمان داخل لاگ‌ها با `TZ=Asia/Tehran` نوشته می‌شود، حتی اگر ساعت Cron روی UTC باشد.
 
@@ -204,10 +213,10 @@ curl -X POST https://YOUR_HOST/api/cron/close-periods \
 از ریشهٔ پروژه، یا با مسیر کامل:
 
 ```bash
-bash /www/wwwroot/task-manager/scripts/cron/db-check.sh
-bash /www/wwwroot/task-manager/scripts/cron/backup.sh
 bash /www/wwwroot/task-manager/scripts/cron/generate.sh
 bash /www/wwwroot/task-manager/scripts/cron/close-periods.sh
+bash /www/wwwroot/task-manager/scripts/cron/backup.sh
+bash /www/wwwroot/task-manager/scripts/cron/db-check.sh
 echo $?
 tail -n 20 /www/wwwroot/task-manager/logs/db-check-$(TZ=Asia/Tehran date +%F).log
 ```
