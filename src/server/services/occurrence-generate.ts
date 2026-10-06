@@ -486,58 +486,70 @@ export function removePendingOnUnassign(input: {
   return result.changes;
 }
 
-/** حذف PENDING جاری بدون پاسخ برای کارهایی که فقط از دپارتمان قدیمی می‌آیند */
+function sourceForUserTemplate(
+  templateId: number,
+  userId: number,
+): number | null {
+  const assignee = resolveAssignees(templateId).find(
+    (row) => row.userId === userId,
+  );
+  if (!assignee) return null;
+  return resolveOccurrenceSource({
+    paths: [
+      ...(assignee.userAssignDate ? [{ kind: "direct" as const }] : []),
+      ...assignee.deptPaths.map((path) => ({
+        kind: "department" as const,
+        departmentId: path.departmentId,
+      })),
+    ],
+    primaryDepartmentId: assignee.primaryDepartmentId,
+    memberships: assignee.deptPaths.map((path) => ({
+      departmentId: path.departmentId,
+      joinedAt: path.joinedAt,
+    })),
+  });
+}
+
+/**
+ * خروج از یک دپارتمان: PENDING بی‌پاسخ دوره جاری با منبع همان دپارتمان.
+ * اگر مسیر دیگری هنوز کاربر را واجد شرایط کند، ردیف می‌ماند و منبع عوض می‌شود.
+ */
 export function removeDeptOnlyPendingOnTransfer(input: {
   userId: number;
   oldDepartmentId: number;
 }): number {
   const today = todayTehran();
-
-  const deptTemplates = db
-    .select({ templateId: taskAssignments.templateId })
-    .from(taskAssignments)
-    .where(
-      and(
-        eq(taskAssignments.assigneeType, "DEPARTMENT"),
-        eq(taskAssignments.departmentId, input.oldDepartmentId),
-      ),
-    )
-    .all()
-    .map((r) => r.templateId);
-
-  if (deptTemplates.length === 0) return 0;
-
-  const directTemplates = new Set(
-    db
-      .select({ templateId: taskAssignments.templateId })
-      .from(taskAssignments)
-      .where(
-        and(
-          eq(taskAssignments.assigneeType, "USER"),
-          eq(taskAssignments.userId, input.userId),
-        ),
-      )
-      .all()
-      .map((r) => r.templateId),
-  );
-
-  const onlyDept = deptTemplates.filter((id) => !directTemplates.has(id));
-  if (onlyDept.length === 0) return 0;
-
-  const result = db
-    .delete(taskOccurrences)
+  const rows = db
+    .select()
+    .from(taskOccurrences)
     .where(
       and(
         eq(taskOccurrences.userId, input.userId),
-        inArray(taskOccurrences.templateId, onlyDept),
+        eq(taskOccurrences.sourceDepartmentId, input.oldDepartmentId),
         eq(taskOccurrences.status, "PENDING"),
         isNull(taskOccurrences.completedAt),
         isNull(taskOccurrences.note),
         sql`${taskOccurrences.periodEnd} >= ${today}`,
       ),
     )
-    .run();
-  return result.changes;
+    .all();
+
+  let removed = 0;
+  for (const row of rows) {
+    const next = sourceForUserTemplate(row.templateId, input.userId);
+    if (next != null && next !== input.oldDepartmentId) {
+      db.update(taskOccurrences)
+        .set({ sourceDepartmentId: next, updatedAt: new Date() })
+        .where(eq(taskOccurrences.id, row.id))
+        .run();
+      continue;
+    }
+    db.delete(taskOccurrences)
+      .where(eq(taskOccurrences.id, row.id))
+      .run();
+    removed += 1;
+  }
+  return removed;
 }
 
 export function onUserDepartmentChanged(input: {

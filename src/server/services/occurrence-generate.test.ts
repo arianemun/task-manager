@@ -670,4 +670,173 @@ describe("تولید occurrence — DB", () => {
     expect(sourceOf(primaryWins)).toBe(deptB.id);
     expect(sourceOf(oldestWins)).toBe(deptA.id);
   });
+
+  it("خروج از یک دپارتمان: PENDING همان منبع حذف یا به مسیر بعدی منتقل می‌شود", async () => {
+    const dates = await loadDates();
+    dates.setNowProvider(() => new Date("2026-10-06T10:00:00+03:30"));
+    const today = dates.todayTehran();
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const bcrypt = await import("bcryptjs");
+    const { setUserDepartments } = await import("@/lib/departments/membership");
+    const { removeDeptOnlyPendingOnTransfer } = await import(
+      "./occurrence-generate"
+    );
+    const hash = await bcrypt.hash("x", 4);
+
+    const admin = db
+      .insert(schema.users)
+      .values({
+        username: `leave_${Date.now()}`,
+        passwordHash: hash,
+        role: "ADMIN",
+        fullName: "ا",
+        fullNameNormalized: "ا",
+        mustChangePassword: false,
+        isActive: true,
+      })
+      .returning()
+      .get();
+    const deptA = db
+      .insert(schema.departments)
+      .values({ name: "خروج-الف", managerId: admin.id })
+      .returning()
+      .get();
+    const deptB = db
+      .insert(schema.departments)
+      .values({ name: "خروج-ب", managerId: admin.id })
+      .returning()
+      .get();
+    const staff = db
+      .insert(schema.users)
+      .values({
+        username: `leave_s_${Date.now()}`,
+        passwordHash: hash,
+        role: "STAFF",
+        fullName: "پ",
+        fullNameNormalized: "پ",
+        departmentId: deptA.id,
+        departmentJoinedAt: "2026-01-01",
+        hireDate: "2026-01-01",
+        mustChangePassword: false,
+        isActive: true,
+      })
+      .returning()
+      .get();
+    setUserDepartments(staff.id, [deptA.id, deptB.id]);
+
+    const onlyA = db
+      .insert(schema.taskTemplates)
+      .values({
+        title: "فقط الف",
+        recurrenceType: "DAILY",
+        recurrenceConfig: { interval: 1 },
+        startDate: "2026-10-01",
+        skipHolidays: false,
+        isActive: true,
+        createdBy: admin.id,
+      })
+      .returning()
+      .get();
+    const both = db
+      .insert(schema.taskTemplates)
+      .values({
+        title: "هر دو",
+        recurrenceType: "DAILY",
+        recurrenceConfig: { interval: 1 },
+        startDate: "2026-10-01",
+        skipHolidays: false,
+        isActive: true,
+        createdBy: admin.id,
+      })
+      .returning()
+      .get();
+    db.insert(schema.taskAssignments)
+      .values([
+        {
+          templateId: onlyA.id,
+          assigneeType: "DEPARTMENT",
+          departmentId: deptA.id,
+        },
+        {
+          templateId: both.id,
+          assigneeType: "DEPARTMENT",
+          departmentId: deptA.id,
+        },
+        {
+          templateId: both.id,
+          assigneeType: "DEPARTMENT",
+          departmentId: deptB.id,
+        },
+      ])
+      .run();
+
+    const pendingOnly = db
+      .insert(schema.taskOccurrences)
+      .values({
+        templateId: onlyA.id,
+        userId: staff.id,
+        periodKey: `D:${today}`,
+        periodStart: today,
+        periodEnd: today,
+        status: "PENDING",
+        sourceDepartmentId: deptA.id,
+      })
+      .returning()
+      .get();
+    db.insert(schema.taskOccurrences)
+      .values({
+        templateId: onlyA.id,
+        userId: staff.id,
+        periodKey: "D:2026-10-01",
+        periodStart: "2026-10-01",
+        periodEnd: "2026-10-01",
+        status: "DONE",
+        completedAt: new Date("2026-10-01T12:00:00+03:30"),
+        sourceDepartmentId: deptA.id,
+      })
+      .run();
+    const pendingBoth = db
+      .insert(schema.taskOccurrences)
+      .values({
+        templateId: both.id,
+        userId: staff.id,
+        periodKey: `D:${today}`,
+        periodStart: today,
+        periodEnd: today,
+        status: "PENDING",
+        sourceDepartmentId: deptA.id,
+      })
+      .returning()
+      .get();
+
+    setUserDepartments(staff.id, [deptB.id]);
+    const removed = removeDeptOnlyPendingOnTransfer({
+      userId: staff.id,
+      oldDepartmentId: deptA.id,
+    });
+
+    expect(removed).toBe(1);
+    expect(
+      db
+        .select()
+        .from(schema.taskOccurrences)
+        .where(eq(schema.taskOccurrences.id, pendingOnly.id))
+        .get(),
+    ).toBeUndefined();
+    const keptDone = db
+      .select()
+      .from(schema.taskOccurrences)
+      .where(eq(schema.taskOccurrences.templateId, onlyA.id))
+      .all();
+    expect(keptDone).toHaveLength(1);
+    expect(keptDone[0]?.status).toBe("DONE");
+    const moved = db
+      .select()
+      .from(schema.taskOccurrences)
+      .where(eq(schema.taskOccurrences.id, pendingBoth.id))
+      .get();
+    expect(moved?.sourceDepartmentId).toBe(deptB.id);
+    expect(moved?.status).toBe("PENDING");
+  });
 });
