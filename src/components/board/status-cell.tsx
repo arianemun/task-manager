@@ -46,6 +46,7 @@ type Props = {
   canEdit: boolean;
   taskTitle?: string;
   staffName?: string;
+  closedByName?: string | null;
 };
 
 const initial: ActionResult | null = null;
@@ -132,6 +133,7 @@ export function StatusCell({
   canEdit,
   taskTitle,
   staffName,
+  closedByName,
 }: Props) {
   const isDesktop = useIsDesktop();
   const [open, setOpen] = useState(false);
@@ -150,6 +152,7 @@ export function StatusCell({
 
   const tip = [
     fa.status[status],
+    closedByName ? `ثبت توسط ${closedByName}` : null,
     completedAt
       ? `ثبت: ${toFaDigits(new Date(completedAt).toLocaleString("fa-IR"))}`
       : null,
@@ -179,11 +182,21 @@ export function StatusCell({
           توضیح: {note}
         </p>
       ) : null}
+      {closedByName ? (
+        <p className="text-muted-foreground text-xs">ثبت توسط {closedByName}</p>
+      ) : null}
     </div>
   );
 
   const chip = (
-    <StatusChip status={status} />
+    <span className="inline-flex flex-col items-center gap-0.5">
+      <StatusChip status={status} />
+      {closedByName ? (
+        <span className="text-muted-foreground max-w-24 truncate text-[10px] leading-tight">
+          {closedByName}
+        </span>
+      ) : null}
+    </span>
   );
 
   if (!canEdit) {

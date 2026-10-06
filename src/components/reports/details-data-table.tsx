@@ -17,7 +17,9 @@ export type DetailRow = {
   periodEnd: string | Date;
   status: string;
   reasonCode: string | null;
+  reasonLabel?: string | null;
   note: string | null;
+  completedByName?: string | null;
 };
 
 function periodEndAsGDate(value: string | Date): GDate {
@@ -55,8 +57,13 @@ const columns: DataTableColumnDef<DetailRow>[] = [
         <p className="text-muted-foreground text-xs tabular-nums">
           پایان: {formatPeriodEnd(row.periodEnd)}
         </p>
+        {row.completedByName && row.completedByName !== row.fullName ? (
+          <p className="text-muted-foreground text-xs">
+            ثبت توسط {row.completedByName}
+          </p>
+        ) : null}
         <p className="text-muted-foreground text-xs">
-          {row.reasonCode ?? row.note ?? "—"}
+          {row.reasonLabel ?? row.reasonCode ?? row.note ?? "—"}
         </p>
       </div>
     ),
@@ -77,16 +84,23 @@ const columns: DataTableColumnDef<DetailRow>[] = [
     accessorKey: "status",
     meta: { label: "وضعیت" },
     header: "وضعیت",
-    cell: ({ row }) =>
-      fa.status[row.original.status as keyof typeof fa.status] ??
-      row.original.status,
+    cell: ({ row }) => {
+      const status =
+        fa.status[row.original.status as keyof typeof fa.status] ??
+        row.original.status;
+      const by = row.original.completedByName;
+      if (by && by !== row.original.fullName) {
+        return `${status} · ${by}`;
+      }
+      return status;
+    },
   },
   {
     id: "reason",
     meta: { label: "دلیل" },
     header: "دلیل",
     cell: ({ row }) =>
-      row.original.reasonCode ?? row.original.note ?? "—",
+      row.original.reasonLabel ?? row.original.reasonCode ?? row.original.note ?? "—",
   },
 ];
 

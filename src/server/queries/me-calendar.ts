@@ -1,6 +1,6 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { holidays, taskOccurrences, taskTemplates } from "@/db/schema";
+import { holidays, taskOccurrences, taskTemplates, users } from "@/db/schema";
 import {
   addGregorianDays,
   compareGDate,
@@ -50,6 +50,7 @@ export function loadMeCalendarMonth(userId: number, anchor: GDate) {
       periodEnd: taskOccurrences.periodEnd,
       title: taskTemplates.title,
       id: taskOccurrences.id,
+      completedByUserId: taskOccurrences.completedByUserId,
     })
     .from(taskOccurrences)
     .innerJoin(taskTemplates, eq(taskOccurrences.templateId, taskTemplates.id))
@@ -90,7 +91,10 @@ export function loadMeCalendarMonth(userId: number, anchor: GDate) {
         compareGDate(r.periodStart, g) <= 0 &&
         compareGDate(r.periodEnd, g) >= 0,
     );
-    const c = countableCompletion(daily.map((r) => r.status));
+    const own = daily.filter(
+      (r) => r.completedByUserId == null || r.completedByUserId === userId,
+    );
+    const c = countableCompletion(own.map((r) => r.status));
     cells.push({
       gDate: g,
       jDay: jd,
@@ -99,7 +103,7 @@ export function loadMeCalendarMonth(userId: number, anchor: GDate) {
       isHoliday: holidaySet.has(g),
       isLeave: leaveSet.has(g),
       rate: c.rate,
-      statuses: daily.map((r) => r.status),
+      statuses: own.map((r) => r.status),
     });
   }
 
@@ -124,7 +128,7 @@ export function loadMeCalendarMonth(userId: number, anchor: GDate) {
 }
 
 export function dayDetail(userId: number, date: GDate) {
-  return db
+  const rows = db
     .select({
       id: taskOccurrences.id,
       title: taskTemplates.title,
@@ -132,6 +136,7 @@ export function dayDetail(userId: number, date: GDate) {
       periodKey: taskOccurrences.periodKey,
       note: taskOccurrences.note,
       priority: taskTemplates.priority,
+      completedByUserId: taskOccurrences.completedByUserId,
     })
     .from(taskOccurrences)
     .innerJoin(taskTemplates, eq(taskOccurrences.templateId, taskTemplates.id))
@@ -143,4 +148,30 @@ export function dayDetail(userId: number, date: GDate) {
       ),
     )
     .all();
+
+  const completerIds = [
+    ...new Set(
+      rows
+        .map((row) => row.completedByUserId)
+        .filter((id): id is number => id != null && id !== userId),
+    ),
+  ];
+  const names = new Map(
+    completerIds.length === 0
+      ? []
+      : db
+          .select({ id: users.id, fullName: users.fullName })
+          .from(users)
+          .where(inArray(users.id, completerIds))
+          .all()
+          .map((person) => [person.id, person.fullName] as const),
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    completedByName:
+      row.completedByUserId != null && row.completedByUserId !== userId
+        ? (names.get(row.completedByUserId) ?? null)
+        : null,
+  }));
 }

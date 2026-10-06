@@ -3,9 +3,13 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { taskOccurrences, users } from "@/db/schema";
+import { taskOccurrences } from "@/db/schema";
 import { authErrorResponse } from "@/lib/auth/http";
 import { requireUser, type AuthUser } from "@/lib/auth/user";
+import {
+  departmentIdsForUser,
+  sharesDepartment,
+} from "@/lib/departments/membership";
 import { parseAttachmentPath } from "@/lib/uploads/attachment";
 import { resolveUploadPath } from "@/lib/uploads/avatar";
 
@@ -26,9 +30,8 @@ function canAccessFile(actor: AuthUser, relative: string): boolean {
     if (!Number.isInteger(ownerId)) return false;
     if (actor.role === "ADMIN") return true;
     if (actor.id === ownerId) return true;
-    if (actor.role === "MANAGER" && actor.departmentId) {
-      const u = db.select().from(users).where(eq(users.id, ownerId)).get();
-      return !!u && u.departmentId === actor.departmentId;
+    if (actor.role === "MANAGER" && actor.departmentIds.length > 0) {
+      return sharesDepartment(actor.departmentIds, departmentIdsForUser(ownerId));
     }
     return false;
   }
@@ -44,9 +47,11 @@ function canAccessFile(actor: AuthUser, relative: string): boolean {
     if (!occ || occ.userId !== parsed.userId) return false;
     if (actor.id === occ.userId) return true;
     if (actor.role === "ADMIN") return true;
-    if (actor.role === "MANAGER" && actor.departmentId) {
-      const u = db.select().from(users).where(eq(users.id, occ.userId)).get();
-      return !!u && u.departmentId === actor.departmentId;
+    if (actor.role === "MANAGER" && actor.departmentIds.length > 0) {
+      return sharesDepartment(
+        actor.departmentIds,
+        departmentIdsForUser(occ.userId),
+      );
     }
     return false;
   }

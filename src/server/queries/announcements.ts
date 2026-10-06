@@ -8,6 +8,7 @@ import {
   users,
 } from "@/db/schema";
 import type { AuthUser } from "@/lib/auth/user";
+import { userIdsInDepartments } from "@/lib/departments/membership";
 
 export function listAnnouncementsForAdmin(actor: AuthUser) {
   const rows = db
@@ -32,7 +33,9 @@ export function listAnnouncementsForAdmin(actor: AuthUser) {
     return rows.filter(
       (r) =>
         r.audience === "ALL" ||
-        (r.audience === "DEPARTMENT" && r.departmentId === actor.departmentId),
+        (r.audience === "DEPARTMENT" &&
+          r.departmentId != null &&
+          actor.departmentIds.includes(r.departmentId)),
     );
   }
   return rows;
@@ -69,7 +72,9 @@ export function listAnnouncementsForStaff(actor: AuthUser) {
     if (a.endsAt && a.endsAt.getTime() < now) return false;
     if (a.audience === "ALL") return true;
     if (a.audience === "DEPARTMENT") {
-      return a.departmentId != null && a.departmentId === actor.departmentId;
+      return (
+        a.departmentId != null && actor.departmentIds.includes(a.departmentId)
+      );
     }
     return targeted.has(a.id);
   });
@@ -134,18 +139,7 @@ export function announcementReadCounts(announcementId: number): {
         .where(and(eq(users.isActive, true), isNull(users.deletedAt)))
         .get()?.c ?? 0;
   } else if (ann.audience === "DEPARTMENT" && ann.departmentId) {
-    total =
-      db
-        .select({ c: sql<number>`count(*)`.mapWith(Number) })
-        .from(users)
-        .where(
-          and(
-            eq(users.departmentId, ann.departmentId),
-            eq(users.isActive, true),
-            isNull(users.deletedAt),
-          ),
-        )
-        .get()?.c ?? 0;
+    total = userIdsInDepartments([ann.departmentId], { activeOnly: true }).length;
   } else {
     total =
       db

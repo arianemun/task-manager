@@ -576,12 +576,12 @@ export function ReasonsBar({
   data,
   loading,
 }: {
-  data: Array<{ reasonCode: string | null; c: number }>;
+  data: Array<{ reasonCode: string | null; reasonLabel?: string | null; c: number }>;
   loading?: boolean;
 }) {
   const isMobile = useIsMobile();
   const rows = data.map((d) => ({
-    name: d.reasonCode ?? "—",
+    name: d.reasonLabel ?? d.reasonCode ?? "—",
     c: Number(d.c),
   }));
   const config = {

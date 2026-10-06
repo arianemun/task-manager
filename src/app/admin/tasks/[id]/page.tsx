@@ -31,8 +31,10 @@ export default async function EditTaskPage({ params }: Props) {
   const canEdit = canManagerEditTemplate(actor, id);
   const categories = listCategories();
   const departments =
-    actor.role === "MANAGER" && actor.departmentId
-      ? listDepartmentsSimple().filter((d) => d.id === actor.departmentId)
+    actor.role === "MANAGER"
+      ? listDepartmentsSimple().filter((d) =>
+          actor.departmentIds.includes(d.id),
+        )
       : listDepartmentsSimple();
   const { rows: staffRows } = listStaffForActor(actor, {
     status: "active",
@@ -70,7 +72,9 @@ export default async function EditTaskPage({ params }: Props) {
           staff={staff}
           departments={departments}
           actorRole={actor.role === "ADMIN" ? "ADMIN" : "MANAGER"}
-          managerDepartmentId={actor.departmentId}
+          managerDepartmentId={
+            actor.departmentIds.length === 1 ? actor.departmentIds[0] : null
+          }
           initial={{
             id: t.id,
             title: t.title,

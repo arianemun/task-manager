@@ -3,13 +3,15 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { taskOccurrences, taskTemplates } from "@/db/schema";
+import { taskOccurrences, taskTemplates, users } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { isAuthError } from "@/lib/auth/errors";
 import { requireUser } from "@/lib/auth/user";
 import { compareGDate, todayTehran } from "@/lib/dates";
 import { statusFromCompletion } from "@/lib/recurrence";
 import { saveOccurrenceAttachment } from "@/lib/uploads/attachment";
+import { getNotDoneReasonsForDepartments } from "@/lib/settings/not-done-reasons";
+import { recordGroupOutcome } from "@/server/services/group-completion";
 import type { ActionResult } from "./auth";
 
 export type SubmitResult = ActionResult & {
@@ -87,6 +89,18 @@ export async function submitOccurrenceAction(
       .get();
     if (!template) return { ok: false, error: "قالب یافت نشد" };
 
+    if (occ.completedByUserId && occ.completedByUserId !== actor.id) {
+      const person = db
+        .select({ fullName: users.fullName })
+        .from(users)
+        .where(eq(users.id, occ.completedByUserId))
+        .get();
+      return {
+        ok: false,
+        error: `این کار گروهی را ${person?.fullName ?? "همکار"} ثبت کرده است`,
+      };
+    }
+
     const note = String(formData.get("note") || "").trim();
     const reasonCode = String(formData.get("reasonCode") || "").trim() || null;
     const file = formData.get("attachment");
@@ -94,6 +108,16 @@ export async function submitOccurrenceAction(
     if (intent === "not_done") {
       if (!reasonCode && !note) {
         return { ok: false, error: "دلیل انجام‌نشدن الزامی است" };
+      }
+      if (reasonCode && reasonCode !== occ.reasonCode) {
+        const allowed = new Set(
+          getNotDoneReasonsForDepartments(actor.departmentIds).map(
+            (reason) => reason.code,
+          ),
+        );
+        if (!allowed.has(reasonCode)) {
+          return { ok: false, error: "این دلیل برای دپارتمان شما مجاز نیست" };
+        }
       }
     }
     if (template.requiresNote && !note) {
@@ -124,18 +148,42 @@ export async function submitOccurrenceAction(
       status = "NOT_DONE";
     }
 
-    db.update(taskOccurrences)
-      .set({
-        status,
-        completedAt: now,
-        note: note || null,
-        reasonCode: intent === "not_done" ? reasonCode : null,
-        attachmentPath,
-        editedAt: wasResponded ? now : occ.editedAt,
-        updatedAt: now,
-      })
-      .where(eq(taskOccurrences.id, occurrenceId))
-      .run();
+    if (status !== "DONE" && status !== "DONE_LATE" && status !== "NOT_DONE") {
+      return { ok: false, error: "وضعیت نامعتبر است" };
+    }
+
+    const group = recordGroupOutcome({
+      templateId: occ.templateId,
+      periodKey: occ.periodKey,
+      completerUserId: actor.id,
+      sourceOccurrenceId: occurrenceId,
+      status,
+      completedAt: now,
+      note: note || null,
+      reasonCode: intent === "not_done" ? reasonCode : null,
+      attachmentPath,
+      editedAt: wasResponded ? now : occ.editedAt,
+    });
+    if (group.mode === "blocked") {
+      return {
+        ok: false,
+        error: `این کار گروهی را ${group.name} ثبت کرده است`,
+      };
+    }
+    if (group.mode === "personal") {
+      db.update(taskOccurrences)
+        .set({
+          status,
+          completedAt: now,
+          note: note || null,
+          reasonCode: intent === "not_done" ? reasonCode : null,
+          attachmentPath,
+          editedAt: wasResponded ? now : occ.editedAt,
+          updatedAt: now,
+        })
+        .where(eq(taskOccurrences.id, occurrenceId))
+        .run();
+    }
 
     writeAuditLog({
       actorId: actor.id,

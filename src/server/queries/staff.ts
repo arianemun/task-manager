@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, like, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, like, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
   departments,
@@ -8,6 +8,10 @@ import {
   type Permission,
 } from "@/db/schema";
 import type { AuthUser } from "@/lib/auth/user";
+import {
+  departmentIdsForUser,
+  userInDepartmentsSql,
+} from "@/lib/departments/membership";
 import {
   assertUserInScope,
   notDeleted,
@@ -43,7 +47,7 @@ export function listStaffForActor(
   }
 
   if (filters.departmentId && actor.role === "ADMIN") {
-    conditions.push(eq(users.departmentId, filters.departmentId));
+    conditions.push(userInDepartmentsSql([filters.departmentId]));
   }
 
   if (filters.q?.trim()) {
@@ -72,7 +76,15 @@ export function listStaffForActor(
       position: users.position,
       isActive: users.isActive,
       departmentId: users.departmentId,
-      departmentName: departments.name,
+      departmentName: sql<string | null>`coalesce(
+        (
+          select group_concat(d.name, '، ')
+          from user_departments ud
+          inner join departments d on d.id = ud.department_id
+          where ud.user_id = ${users.id}
+        ),
+        ${departments.name}
+      )`,
       lastLoginAt: users.lastLoginAt,
       mustChangePassword: users.mustChangePassword,
     })
@@ -90,13 +102,17 @@ export function listStaffForActor(
 export function getStaffDetailForActor(actor: AuthUser, userId: number) {
   const user = assertUserInScope(actor, userId);
 
-  const department = user.departmentId
-    ? db
-        .select()
-        .from(departments)
-        .where(eq(departments.id, user.departmentId))
-        .get()
-    : null;
+  const departmentIds = departmentIdsForUser(userId);
+  const memberships =
+    departmentIds.length === 0
+      ? []
+      : db
+          .select()
+          .from(departments)
+          .where(inArray(departments.id, departmentIds))
+          .orderBy(asc(departments.name))
+          .all();
+  const department = memberships[0] ?? null;
 
   const permissions = db
     .select({ permission: userPermissions.permission })
@@ -119,15 +135,17 @@ export function getStaffDetailForActor(actor: AuthUser, userId: number) {
     .orderBy(desc(staffNotes.createdAt))
     .all();
 
-  return { user, department, permissions, notes };
+  return { user, department, departments: memberships, permissions, notes };
 }
 
 export function listDepartmentsForSelect(actor: AuthUser) {
-  if (actor.role === "MANAGER" && actor.departmentId) {
+  if (actor.role === "MANAGER") {
+    if (actor.departmentIds.length === 0) return [];
     return db
       .select()
       .from(departments)
-      .where(eq(departments.id, actor.departmentId))
+      .where(inArray(departments.id, actor.departmentIds))
+      .orderBy(asc(departments.name))
       .all();
   }
   return db.select().from(departments).orderBy(asc(departments.name)).all();
@@ -141,9 +159,22 @@ export function listAllDepartments() {
       managerId: departments.managerId,
       createdAt: departments.createdAt,
       memberCount: sql<number>`(
-        select count(*) from users
-        where users.department_id = ${departments.id}
-          and users.deleted_at is null
+        select count(distinct member_id) from (
+          select user_departments.user_id as member_id
+          from user_departments
+          inner join users on users.id = user_departments.user_id
+          where user_departments.department_id = ${departments.id}
+            and users.deleted_at is null
+          union
+          select users.id as member_id
+          from users
+          where users.department_id = ${departments.id}
+            and users.deleted_at is null
+            and not exists (
+              select 1 from user_departments
+              where user_departments.user_id = users.id
+            )
+        )
       )`.mapWith(Number),
     })
     .from(departments)

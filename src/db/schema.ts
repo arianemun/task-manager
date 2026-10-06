@@ -121,6 +121,23 @@ export const users = sqliteTable(
   ],
 );
 
+export const userDepartments = sqliteTable(
+  "user_departments",
+  {
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    departmentId: integer("department_id")
+      .notNull()
+      .references(() => departments.id, { onDelete: "cascade" }),
+    joinedAt: text("joined_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.departmentId] }),
+    index("user_departments_department_idx").on(t.departmentId),
+  ],
+);
+
 export const userPermissions = sqliteTable(
   "user_permissions",
   {
@@ -297,6 +314,13 @@ export const taskOccurrences = sqliteTable(
     /** کد دلیل آماده‌ی «انجام نشد» برای گروه‌بندی گزارش */
     reasonCode: text("reason_code"),
     attachmentPath: text("attachment_path"),
+    /**
+     * برای کار گروهی دپارتمان: کسی که نتیجه را ثبت کرده.
+     * روی ردیف بقیه اعضا هم همین شناسه می‌ماند تا کار برای آن‌ها بسته شود.
+     */
+    completedByUserId: integer("completed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     /** زمان آخرین ویرایش پاسخ پس از ثبت اول */
     editedAt: integer("edited_at", { mode: "timestamp_ms" }),
     reviewedBy: integer("reviewed_by").references(() => users.id, {
@@ -323,6 +347,7 @@ export const taskOccurrences = sqliteTable(
     index("task_occurrences_reason_code_idx").on(t.reasonCode),
     index("task_occurrences_period_end_idx").on(t.periodEnd),
     index("task_occurrences_user_period_end_idx").on(t.userId, t.periodEnd),
+    index("task_occurrences_completed_by_idx").on(t.completedByUserId),
   ],
 );
 
@@ -376,6 +401,32 @@ export const auditLogs = sqliteTable(
     index("audit_logs_actor_id_idx").on(t.actorId),
     index("audit_logs_entity_idx").on(t.entity, t.entityId),
     index("audit_logs_created_at_idx").on(t.createdAt),
+  ],
+);
+
+/** دلایل آمادهٔ «انجام نشد» — اگر به دپارتمانی وصل نباشد برای همه است */
+export const notDoneReasons = sqliteTable("not_done_reasons", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  code: text("code").notNull().unique(),
+  label: text("label").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+export const notDoneReasonDepartments = sqliteTable(
+  "not_done_reason_departments",
+  {
+    reasonId: integer("reason_id")
+      .notNull()
+      .references(() => notDoneReasons.id, { onDelete: "cascade" }),
+    departmentId: integer("department_id")
+      .notNull()
+      .references(() => departments.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.reasonId, t.departmentId] }),
+    index("not_done_reason_departments_department_idx").on(t.departmentId),
   ],
 );
 

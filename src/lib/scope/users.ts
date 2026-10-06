@@ -3,6 +3,11 @@ import { db } from "@/db";
 import { users, type Role } from "@/db/schema";
 import { AuthError } from "@/lib/auth/errors";
 import type { AuthUser } from "@/lib/auth/user";
+import {
+  departmentIdsForUser,
+  sharesDepartment,
+  userInDepartmentsSql,
+} from "@/lib/departments/membership";
 
 /** شرط‌های محدوده برای لیست کاربران بر اساس نقش actor */
 export function scopeUsersQuery(actor: AuthUser): SQL | undefined {
@@ -10,14 +15,10 @@ export function scopeUsersQuery(actor: AuthUser): SQL | undefined {
     return undefined;
   }
   if (actor.role === "MANAGER") {
-    if (!actor.departmentId) {
-      // سرپرست بدون دپارتمان هیچ‌کس را نمی‌بیند
+    if (actor.departmentIds.length === 0) {
       return eq(users.id, -1);
     }
-    return and(
-      eq(users.departmentId, actor.departmentId),
-      isNull(users.deletedAt),
-    );
+    return and(userInDepartmentsSql(actor.departmentIds), isNull(users.deletedAt));
   }
   return eq(users.id, actor.id);
 }
@@ -39,7 +40,9 @@ export function assertUserInScope(
   if (actor.role === "ADMIN") return row;
 
   if (actor.role === "MANAGER") {
-    if (!actor.departmentId || row.departmentId !== actor.departmentId) {
+    if (
+      !sharesDepartment(actor.departmentIds, departmentIdsForUser(row.id))
+    ) {
       throw new AuthError(
         "FORBIDDEN",
         "به پرسنل این دپارتمان دسترسی ندارید",

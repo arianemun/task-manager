@@ -58,6 +58,8 @@ export const fa = {
     staff: "پرسنل",
     departments: "دپارتمان‌ها",
     tasks: "کارها",
+    categories: "دسته‌بندی کارها",
+    reasons: "دلایل انجام‌نشدن",
     board: "پایش روزانه",
     announcements: "اطلاعیه‌ها",
     holidays: "تعطیلات",

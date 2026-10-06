@@ -38,8 +38,8 @@ export default async function AdminReportsPage({ searchParams }: Props) {
 
   const sp = await searchParams;
   const filters = parseReportFilters(sp);
-  if (actor.role === "MANAGER" && actor.departmentId) {
-    filters.departmentId = actor.departmentId;
+  if (actor.role === "MANAGER" && actor.departmentIds.length === 1) {
+    filters.departmentId = actor.departmentIds[0]!;
   }
 
   const departments = listDepartmentsForSelect(actor);

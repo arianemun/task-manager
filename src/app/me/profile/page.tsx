@@ -31,7 +31,9 @@ export default async function MeProfilePage() {
       <Card>
         <CardHeader>
           <CardTitle>آواتار</CardTitle>
-          <CardDescription>تصویر قبل از آپلود کوچک می‌شود</CardDescription>
+          <CardDescription>
+            پس از انتخاب، ناحیهٔ نمایش را برش دهید
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <AvatarForm fullName={user.fullName} avatarPath={user.avatarPath} />

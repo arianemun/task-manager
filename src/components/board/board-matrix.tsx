@@ -103,6 +103,12 @@ export function BoardMatrix({ data, canEdit }: Props) {
                             canEdit={canEdit}
                             taskTitle={t.title}
                             staffName={s.fullName}
+                            closedByName={
+                              cell.completedByUserId &&
+                              cell.completedByUserId !== s.id
+                                ? cell.completedByName
+                                : null
+                            }
                           />
                         ) : (
                           <span className="text-muted-foreground text-xs">—</span>
@@ -190,6 +196,12 @@ export function BoardMatrix({ data, canEdit }: Props) {
                               canEdit={canEdit}
                               taskTitle={task.title}
                               staffName={s.fullName}
+                              closedByName={
+                                cell!.completedByUserId &&
+                                cell!.completedByUserId !== s.id
+                                  ? cell!.completedByName
+                                  : null
+                              }
                             />
                           </li>
                         );

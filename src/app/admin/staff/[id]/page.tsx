@@ -72,7 +72,9 @@ export default async function StaffDetailPage({ params, searchParams }: Props) {
   const sp = await searchParams;
   const tabRaw = Array.isArray(sp.tab) ? sp.tab[0] : sp.tab;
   const departments = listDepartmentsForSelect(actor);
-  const { user, department, permissions, notes } = detail;
+  const { user, departments: memberships, permissions, notes } = detail;
+  const departmentLabel =
+    memberships.map((item) => item.name).join("، ") || null;
 
   const reportTabs = new Set([
     "report",
@@ -89,8 +91,8 @@ export default async function StaffDetailPage({ params, searchParams }: Props) {
   if (tabRaw && reportTabs.has(tabRaw)) {
     const filters = parseReportFilters(sp);
     filters.userId = id;
-    if (actor.role === "MANAGER" && actor.departmentId) {
-      filters.departmentId = actor.departmentId;
+    if (actor.role === "MANAGER" && actor.departmentIds.length === 1) {
+      filters.departmentId = actor.departmentIds[0]!;
     }
     const { rows: staffRows } = listStaffForActor(actor, {
       status: "active",
@@ -117,7 +119,7 @@ export default async function StaffDetailPage({ params, searchParams }: Props) {
 
     return (
       <Stack>
-        <StaffDetailHeader user={user} departmentName={department?.name} />
+        <StaffDetailHeader user={user} departmentName={departmentLabel} />
         <StaffDetailTabs userId={id} active="report" />
         <StaffReportPanel
           filters={filters}
@@ -155,13 +157,13 @@ export default async function StaffDetailPage({ params, searchParams }: Props) {
     activeTab === "tasks"
       ? listTasksForActor(actor, {
           status: "active",
-          departmentId: user.departmentId,
+          departmentIds: memberships.map((item) => item.id),
         })
       : [];
 
   return (
     <Stack>
-      <StaffDetailHeader user={user} departmentName={department?.name} />
+      <StaffDetailHeader user={user} departmentName={departmentLabel} />
       <StaffDetailTabs userId={id} active={activeTab} />
 
       {activeTab === "info" ? (
@@ -177,7 +179,7 @@ export default async function StaffDetailPage({ params, searchParams }: Props) {
               </div>
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">دپارتمان</span>
-                <span>{department?.name ?? "—"}</span>
+                <span>{departmentLabel ?? "—"}</span>
               </div>
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">وضعیت</span>
@@ -217,6 +219,7 @@ export default async function StaffDetailPage({ params, searchParams }: Props) {
                   email: user.email,
                   position: user.position,
                   departmentId: user.departmentId,
+                  departmentIds: memberships.map((item) => item.id),
                   role: user.role,
                   hireDate: user.hireDate,
                   permissions,

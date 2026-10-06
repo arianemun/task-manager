@@ -1,0 +1,2 @@
+ALTER TABLE `task_occurrences` ADD `completed_by_user_id` integer REFERENCES users(id) ON DELETE SET NULL;--> statement-breakpoint
+CREATE INDEX `task_occurrences_completed_by_idx` ON `task_occurrences` (`completed_by_user_id`);

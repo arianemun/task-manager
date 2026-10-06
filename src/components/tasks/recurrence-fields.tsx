@@ -68,17 +68,19 @@ export function RecurrenceFields({ value, onChange }: Props) {
     return (
       <ToggleGroup
         type="multiple"
+        dir="rtl"
+        spacing={2}
         value={list.map(String)}
         onValueChange={(vals) => onToggle(vals.map(Number))}
         variant="outline"
-        className="flex flex-wrap justify-start gap-1"
+        className="grid w-full grid-cols-4 gap-2 sm:grid-cols-7"
       >
         {WEEKDAYS.map((d) => (
           <ToggleGroupItem
             key={d}
             value={String(d)}
             className={cn(
-              "min-h-9 rounded-md px-2.5 text-xs",
+              "h-10 w-full rounded-md border px-1 text-xs shadow-none",
               activeClass,
             )}
             aria-label={fa.weekdays[d]}

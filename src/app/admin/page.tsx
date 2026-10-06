@@ -27,8 +27,8 @@ export default async function AdminDashboardPage() {
 
   const kpis = loadDashboardKpis(actor);
   const monthFilters = parseReportFilters({ range: "month" });
-  if (actor.role === "MANAGER" && actor.departmentId) {
-    monthFilters.departmentId = actor.departmentId;
+  if (actor.role === "MANAGER" && actor.departmentIds.length === 1) {
+    monthFilters.departmentId = actor.departmentIds[0]!;
   }
   const trend = aggregateByDay(actor, { ...monthFilters, granularity: "day" });
   const donut = aggregateStatusDonut(actor, monthFilters);

@@ -4,7 +4,7 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { departments, users } from "@/db/schema";
+import { departments, userDepartments, users } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { isAuthError } from "@/lib/auth/errors";
 import { requirePermission, requireUser } from "@/lib/auth/user";
@@ -113,11 +113,18 @@ export async function deleteDepartmentAction(
       return { ok: false, error: "شناسه نامعتبر است" };
     }
 
-    const members = db
+    const linked = db
+      .select({ c: count() })
+      .from(userDepartments)
+      .innerJoin(users, eq(users.id, userDepartments.userId))
+      .where(and(eq(userDepartments.departmentId, id), isNull(users.deletedAt)))
+      .get();
+    const legacy = db
       .select({ c: count() })
       .from(users)
       .where(and(eq(users.departmentId, id), isNull(users.deletedAt)))
       .get();
+    const members = { c: Math.max(linked?.c ?? 0, legacy?.c ?? 0) };
 
     if ((members?.c ?? 0) > 0) {
       return {

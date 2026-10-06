@@ -18,6 +18,7 @@ export type TaskListFilters = {
   recurrenceType?: string | null;
   status?: "active" | "archived" | "all";
   departmentId?: number | null;
+  departmentIds?: number[];
 };
 
 export function listTasksForActor(actor: AuthUser, filters: TaskListFilters = {}) {
@@ -55,14 +56,19 @@ export function listTasksForActor(actor: AuthUser, filters: TaskListFilters = {}
       )!,
     );
   }
-  if (filters.departmentId) {
+  const departmentFilter = filters.departmentIds?.length
+    ? filters.departmentIds
+    : filters.departmentId
+      ? [filters.departmentId]
+      : [];
+  if (departmentFilter.length > 0) {
     const ids = db
       .select({ templateId: taskAssignments.templateId })
       .from(taskAssignments)
       .where(
         and(
           eq(taskAssignments.assigneeType, "DEPARTMENT"),
-          eq(taskAssignments.departmentId, filters.departmentId),
+          inArray(taskAssignments.departmentId, departmentFilter),
         ),
       )
       .all()

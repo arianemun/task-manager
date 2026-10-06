@@ -354,8 +354,10 @@ export function ReportShell(props: Props) {
                     <div className="text-muted-foreground flex flex-wrap gap-2 text-xs">
                       <span>{n.fullName}</span>
                       <span>{n.title}</span>
-                      {n.reasonCode ? (
-                        <Badge variant="outline">{n.reasonCode}</Badge>
+                      {n.reasonLabel || n.reasonCode ? (
+                        <Badge variant="outline">
+                          {n.reasonLabel ?? n.reasonCode}
+                        </Badge>
                       ) : null}
                     </div>
                     <p>{n.note}</p>

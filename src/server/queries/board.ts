@@ -7,6 +7,7 @@ import {
   type OccurrenceStatus,
 } from "@/db/schema";
 import type { AuthUser } from "@/lib/auth/user";
+import { userInDepartmentsSql } from "@/lib/departments/membership";
 import {
   endOfJalaliMonth,
   endOfJalaliWeek,
@@ -25,6 +26,8 @@ export type BoardCell = {
   periodKey: string;
   periodStart: string;
   periodEnd: string;
+  completedByUserId: number | null;
+  completedByName: string | null;
 };
 
 export type BoardPayload = {
@@ -45,8 +48,8 @@ function scopedStaff(actor: AuthUser) {
     isNull(users.deletedAt),
     inArray(users.role, ["STAFF", "MANAGER"]),
   ];
-  if (actor.role === "MANAGER" && actor.departmentId) {
-    conditions.push(eq(users.departmentId, actor.departmentId));
+  if (actor.role === "MANAGER" && actor.departmentIds.length > 0) {
+    conditions.push(userInDepartmentsSql(actor.departmentIds));
   }
   return db
     .select({ id: users.id, fullName: users.fullName })
@@ -56,18 +59,49 @@ function scopedStaff(actor: AuthUser) {
     .all();
 }
 
+function withCompleterNames<T extends { completedByUserId: number | null }>(
+  rows: T[],
+): Array<T & { completedByName: string | null }> {
+  const ids = [
+    ...new Set(
+      rows
+        .map((row) => row.completedByUserId)
+        .filter((id): id is number => id != null),
+    ),
+  ];
+  const names = new Map(
+    ids.length === 0
+      ? []
+      : db
+          .select({ id: users.id, fullName: users.fullName })
+          .from(users)
+          .where(inArray(users.id, ids))
+          .all()
+          .map((person) => [person.id, person.fullName] as const),
+  );
+  return rows.map((row) => ({
+    ...row,
+    completedByName: row.completedByUserId
+      ? (names.get(row.completedByUserId) ?? null)
+      : null,
+  }));
+}
+
 function buildSummary(
   staff: Array<{ id: number; fullName: string }>,
   cells: BoardCell[],
   forDay: boolean,
 ) {
-  const counted = cells.filter(
+  const ownCells = cells.filter(
+    (c) => c.completedByUserId == null || c.completedByUserId === c.userId,
+  );
+  const counted = ownCells.filter(
     (c) => c.status !== "EXCUSED" && c.status !== "PENDING",
   );
   const done = counted.filter(
     (c) => c.status === "DONE" || c.status === "DONE_LATE",
   ).length;
-  const unanswered = cells.filter((c) => c.status === "PENDING").length;
+  const unanswered = ownCells.filter((c) => c.status === "PENDING").length;
 
   let silentStaff: Array<{ id: number; fullName: string }> = [];
   if (forDay) {
@@ -116,6 +150,7 @@ export function loadBoardDay(actor: AuthUser, date: GDate): BoardPayload {
       periodKey: taskOccurrences.periodKey,
       periodStart: taskOccurrences.periodStart,
       periodEnd: taskOccurrences.periodEnd,
+      completedByUserId: taskOccurrences.completedByUserId,
       taskTitle: taskTemplates.title,
       recurrenceType: taskTemplates.recurrenceType,
     })
@@ -132,8 +167,9 @@ export function loadBoardDay(actor: AuthUser, date: GDate): BoardPayload {
     )
     .all();
 
+  const named = withCompleterNames(rows);
   const taskMap = new Map<number, { id: number; title: string; recurrenceType: string }>();
-  const cells: BoardCell[] = rows.map((c) => {
+  const cells: BoardCell[] = named.map((c) => {
     taskMap.set(c.templateId, {
       id: c.templateId,
       title: c.taskTitle,
@@ -149,6 +185,8 @@ export function loadBoardDay(actor: AuthUser, date: GDate): BoardPayload {
       periodKey: c.periodKey,
       periodStart: c.periodStart,
       periodEnd: c.periodEnd,
+      completedByUserId: c.completedByUserId,
+      completedByName: c.completedByName,
     };
   });
 
@@ -195,6 +233,7 @@ export function loadBoardPeriod(
       periodKey: taskOccurrences.periodKey,
       periodStart: taskOccurrences.periodStart,
       periodEnd: taskOccurrences.periodEnd,
+      completedByUserId: taskOccurrences.completedByUserId,
       taskTitle: taskTemplates.title,
       recurrenceType: taskTemplates.recurrenceType,
     })
@@ -211,8 +250,9 @@ export function loadBoardPeriod(
     )
     .all();
 
+  const named = withCompleterNames(rows);
   const taskMap = new Map<number, { id: number; title: string; recurrenceType: string }>();
-  const cells: BoardCell[] = rows.map((c) => {
+  const cells: BoardCell[] = named.map((c) => {
     taskMap.set(c.templateId, {
       id: c.templateId,
       title: c.taskTitle,
@@ -228,6 +268,8 @@ export function loadBoardPeriod(
       periodKey: c.periodKey,
       periodStart: c.periodStart,
       periodEnd: c.periodEnd,
+      completedByUserId: c.completedByUserId,
+      completedByName: c.completedByName,
     };
   });
 

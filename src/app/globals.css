@@ -72,20 +72,20 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.21 0.006 286);
 
-  /* accent واحد (آبی-zinc ملایم) */
-  --primary: oklch(0.45 0.09 250);
-  --primary-foreground: oklch(0.99 0.002 286);
+  /* accent واحد */
+  --primary: #fb620e;
+  --primary-foreground: #1c120c;
   --secondary: oklch(0.96 0.004 286);
   --secondary-foreground: oklch(0.28 0.01 286);
   --muted: oklch(0.96 0.004 286);
   --muted-foreground: oklch(0.5 0.015 286);
-  --accent: oklch(0.96 0.01 250);
-  --accent-foreground: oklch(0.28 0.04 250);
+  --accent: color-mix(in srgb, #fb620e 14%, #ffffff);
+  --accent-foreground: #7a2e06;
   --destructive: oklch(0.55 0.2 25);
   --destructive-foreground: oklch(0.99 0.002 286);
   --border: oklch(0.91 0.006 286);
   --input: oklch(0.91 0.006 286);
-  --ring: oklch(0.45 0.09 250);
+  --ring: #fb620e;
 
   --shadow-soft: 0 1px 2px oklch(0.21 0.006 286 / 0.04),
     0 4px 12px oklch(0.21 0.006 286 / 0.04);
@@ -101,8 +101,8 @@
   --sidebar-foreground: oklch(0.28 0.01 286);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.96 0.01 250);
-  --sidebar-accent-foreground: oklch(0.28 0.04 250);
+  --sidebar-accent: color-mix(in srgb, #fb620e 16%, #ffffff);
+  --sidebar-accent-foreground: #7a2e06;
   --sidebar-border: oklch(0.91 0.006 286);
   --sidebar-ring: var(--ring);
 }
@@ -115,19 +115,19 @@
   --card-foreground: oklch(0.96 0.004 286);
   --popover: oklch(0.2 0.012 286);
   --popover-foreground: oklch(0.96 0.004 286);
-  --primary: oklch(0.72 0.1 250);
-  --primary-foreground: oklch(0.18 0.02 250);
+  --primary: #fb620e;
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.26 0.012 286);
   --secondary-foreground: oklch(0.96 0.004 286);
   --muted: oklch(0.26 0.012 286);
   --muted-foreground: oklch(0.7 0.015 286);
-  --accent: oklch(0.28 0.03 250);
-  --accent-foreground: oklch(0.96 0.004 286);
+  --accent: color-mix(in srgb, #fb620e 24%, #1c1c22);
+  --accent-foreground: #fff7f2;
   --destructive: oklch(0.65 0.18 25);
   --destructive-foreground: oklch(0.99 0.002 286);
   --border: oklch(0.3 0.012 286);
   --input: oklch(0.3 0.012 286);
-  --ring: oklch(0.72 0.1 250);
+  --ring: #fb620e;
 
   --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.35),
     0 4px 16px oklch(0 0 0 / 0.25);
@@ -143,10 +143,15 @@
   --sidebar-foreground: oklch(0.96 0.004 286);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.28 0.03 250);
-  --sidebar-accent-foreground: oklch(0.96 0.004 286);
+  --sidebar-accent: color-mix(in srgb, #fb620e 28%, #16161c);
+  --sidebar-accent-foreground: #fff7f2;
   --sidebar-border: oklch(0.3 0.012 286);
   --sidebar-ring: var(--ring);
+}
+
+/* سوئیچ در صفحه RTL هم دایره را داخل کادر نگه می‌دارد */
+[data-slot="switch"] {
+  direction: ltr;
 }
 
 @layer base {

@@ -60,10 +60,12 @@ export function TaskCard({ occ, reasons }: Props) {
   const [pending, startTransition] = useTransition();
   const [justSaved, setJustSaved] = useState(false);
 
+  const closedByOther = occ.fulfilledByOther;
   const locked =
     occ.locked ||
     local.status === "MISSED" ||
-    local.status === "EXCUSED";
+    local.status === "EXCUSED" ||
+    closedByOther;
   const responded = local.status !== "PENDING";
 
   async function submit(
@@ -211,7 +213,12 @@ export function TaskCard({ occ, reasons }: Props) {
         </a>
       ) : null}
 
-      {locked ? (
+      {closedByOther ? (
+        <p className="text-muted-foreground text-sm">
+          {occ.completedByName ?? "همکار"} این کار گروهی را ثبت کرده و برای شما
+          بسته شده است.
+        </p>
+      ) : locked ? (
         <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
           <Lock className="size-3.5" />
           قفل — فقط خواندنی
@@ -246,6 +253,17 @@ export function TaskCard({ occ, reasons }: Props) {
           </Button>
         </div>
       )}
+
+      {occ.groupTask && !closedByOther && !locked && !responded ? (
+        <p className="text-muted-foreground text-xs">
+          کار گروهی است. با ثبت شما برای بقیه اعضای دپارتمان هم بسته می‌شود.
+        </p>
+      ) : null}
+      {occ.groupTask && !closedByOther && responded ? (
+        <p className="text-muted-foreground text-xs">
+          شما این کار گروهی را ثبت کردید.
+        </p>
+      ) : null}
 
       <ResponseSheet
         open={sheet != null}

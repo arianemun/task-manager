@@ -6,6 +6,7 @@ import {
   ratesFromCounts,
   type StatusCounts,
 } from "@/lib/reports";
+import { personalCreditSql } from "@/lib/tasks/group-work";
 
 /**
  * شمارش وضعیت‌ها با قاعده period_end در بازه — منبع مشترک /me/report و گزارش مدیر.
@@ -19,6 +20,7 @@ export function statusCountsByPeriodEnd(input: {
   const clauses: SQL[] = [
     sql`${taskOccurrences.periodEnd} >= ${input.from}`,
     sql`${taskOccurrences.periodEnd} <= ${input.to}`,
+    personalCreditSql(),
   ];
   if (input.userId != null) {
     clauses.push(eq(taskOccurrences.userId, input.userId));

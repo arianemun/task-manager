@@ -23,6 +23,7 @@ type DetailItem = {
   title: string;
   status: string;
   note: string | null;
+  completedByName?: string | null;
 };
 
 type Props = {
@@ -56,7 +57,14 @@ function DayDetailList({ detail }: { detail: DetailItem[] }) {
           key={d.id}
           className="flex items-start justify-between gap-2 border-b pb-2 last:border-0"
         >
-          <span className="min-w-0">{d.title}</span>
+          <span className="min-w-0">
+            {d.title}
+            {d.completedByName ? (
+              <span className="text-muted-foreground block text-xs">
+                ثبت توسط {d.completedByName}
+              </span>
+            ) : null}
+          </span>
           <Badge
             variant={
               d.status === "DONE" || d.status === "DONE_LATE"

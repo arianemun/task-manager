@@ -10,7 +10,8 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         TZ: "Asia/Tehran",
-        PORT: 3000,
+        PORT: 3230,
+        HOSTNAME: "0.0.0.0",
         // این مسیرها را نسبت به ریشه پروژه (نه standalone) تنظیم کنید:
         // DATABASE_URL=file:/var/task-manager/data/app.db
         // UPLOAD_DIR=/var/task-manager/uploads

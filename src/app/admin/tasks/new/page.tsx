@@ -22,8 +22,10 @@ export default async function NewTaskPage({ searchParams }: Props) {
 
   const categories = listCategories();
   const departments =
-    actor.role === "MANAGER" && actor.departmentId
-      ? listDepartmentsSimple().filter((d) => d.id === actor.departmentId)
+    actor.role === "MANAGER"
+      ? listDepartmentsSimple().filter((d) =>
+          actor.departmentIds.includes(d.id),
+        )
       : listDepartmentsSimple();
   const { rows: staffRows } = listStaffForActor(actor, {
     status: "active",
@@ -60,8 +62,10 @@ export default async function NewTaskPage({ searchParams }: Props) {
       recurrenceConfig: (t.recurrenceConfig ?? {}) as Record<string, unknown>,
       userIds: detail.userIds,
       departmentIds:
-        actor.role === "MANAGER" && actor.departmentId
-          ? [actor.departmentId]
+        actor.role === "MANAGER"
+          ? detail.departmentIds.filter((id) =>
+              actor.departmentIds.includes(id),
+            )
           : detail.departmentIds,
     };
   }
@@ -80,7 +84,9 @@ export default async function NewTaskPage({ searchParams }: Props) {
         staff={staff}
         departments={departments}
         actorRole={actor.role === "ADMIN" ? "ADMIN" : "MANAGER"}
-        managerDepartmentId={actor.departmentId}
+        managerDepartmentId={
+          actor.departmentIds.length === 1 ? actor.departmentIds[0] : null
+        }
         initial={initial}
         copyFromTitle={copyFromTitle}
       />

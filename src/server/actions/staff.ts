@@ -1,11 +1,13 @@
 "use server";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import {
   PERMISSIONS,
+  departments,
+  taskAssignments,
   userPermissions,
   users,
   type Permission,
@@ -35,7 +37,15 @@ import {
   usernameSchema,
 } from "@/lib/validation/iran";
 import { normalizePersianText } from "@/lib/validation/normalize";
-import { onUserDepartmentChanged } from "@/server/services/occurrence-generate";
+import {
+  departmentIdsForUser,
+  setUserDepartments,
+  userIdsInDepartments,
+} from "@/lib/departments/membership";
+import {
+  generateOccurrences,
+  removeDeptOnlyPendingOnTransfer,
+} from "@/server/services/occurrence-generate";
 import type { ActionResult } from "./auth";
 
 const createStaffSchema = z.object({
@@ -49,6 +59,71 @@ const createStaffSchema = z.object({
   role: z.enum(["ADMIN", "MANAGER", "STAFF"]),
   hireDate: z.string().trim().optional().or(z.literal("")),
 });
+
+function parseDepartmentIds(value: FormDataEntryValue | null): number[] {
+  const raw = String(value ?? "").trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      return [
+        ...new Set(
+          parsed
+            .map((id) => Number(id))
+            .filter((id) => Number.isInteger(id) && id > 0),
+        ),
+      ];
+    }
+  } catch {
+    /* مقدار تکی */
+  }
+  const single = Number(raw);
+  return Number.isInteger(single) && single > 0 ? [single] : [];
+}
+
+function unknownDepartmentError(ids: number[]): string | null {
+  if (ids.length === 0) return null;
+  const found = db
+    .select({ id: departments.id })
+    .from(departments)
+    .where(inArray(departments.id, ids))
+    .all();
+  if (found.length !== ids.length) return "دپارتمان نامعتبر است";
+  return null;
+}
+
+function generateDepartmentTasks(userId: number, departmentIds: number[]) {
+  const today = todayTehran();
+  for (const departmentId of departmentIds) {
+    const templates = db
+      .select({ templateId: taskAssignments.templateId })
+      .from(taskAssignments)
+      .where(
+        and(
+          eq(taskAssignments.assigneeType, "DEPARTMENT"),
+          eq(taskAssignments.departmentId, departmentId),
+        ),
+      )
+      .all();
+    for (const template of templates) {
+      generateOccurrences({
+        templateId: template.templateId,
+        userId,
+        from: today,
+        to: today,
+        skipCursorUpdate: true,
+      });
+    }
+  }
+}
+
+function applyDepartmentMembership(userId: number, departmentIds: number[]) {
+  const { added, removed } = setUserDepartments(userId, departmentIds);
+  for (const departmentId of removed) {
+    removeDeptOnlyPendingOnTransfer({ userId, oldDepartmentId: departmentId });
+  }
+  generateDepartmentTasks(userId, added);
+}
 
 function parsePermissions(formData: FormData): Permission[] {
   return formData
@@ -73,7 +148,7 @@ export async function createStaffAction(
       phone: formData.get("phone") ?? "",
       email: formData.get("email") ?? "",
       position: formData.get("position") ?? "",
-      departmentId: formData.get("departmentId") || null,
+      departmentId: null,
       role: formData.get("role") || "STAFF",
       hireDate: formData.get("hireDate") ?? "",
     });
@@ -84,12 +159,17 @@ export async function createStaffAction(
 
     const data = parsed.data;
     assertCanAssignRole(actor, data.role);
+    let departmentIds = parseDepartmentIds(
+      formData.get("departmentIds") || formData.get("departmentId"),
+    );
+    const deptError = unknownDepartmentError(departmentIds);
+    if (deptError) return { ok: false, error: deptError };
 
     if (actor.role === "MANAGER") {
-      if (!actor.departmentId) {
+      if (actor.departmentIds.length === 0) {
         return { ok: false, error: "دپارتمان سرپرست مشخص نیست" };
       }
-      data.departmentId = actor.departmentId;
+      departmentIds = [actor.departmentIds[0]!];
       if (data.role !== "STAFF") {
         return { ok: false, error: "سرپرست فقط می‌تواند پرسنل ایجاد کند" };
       }
@@ -119,8 +199,8 @@ export async function createStaffAction(
         phone: data.phone || null,
         email: data.email || null,
         position: data.position || null,
-        departmentId: data.departmentId ?? null,
-        departmentJoinedAt: data.departmentId ? todayTehran() : null,
+        departmentId: departmentIds[0] ?? null,
+        departmentJoinedAt: departmentIds.length > 0 ? todayTehran() : null,
         hireDate: data.hireDate || null,
         mustChangePassword: true,
         isActive: true,
@@ -128,6 +208,9 @@ export async function createStaffAction(
       })
       .returning({ id: users.id })
       .get();
+
+    setUserDepartments(row.id, departmentIds);
+    generateDepartmentTasks(row.id, departmentIds);
 
     const perms: Permission[] =
       actor.role === "MANAGER" ? [] : parsePermissions(formData);
@@ -145,7 +228,7 @@ export async function createStaffAction(
       meta: {
         username: data.username,
         role: data.role,
-        departmentId: data.departmentId,
+        departmentIds,
         permissions: perms,
       },
     });
@@ -184,7 +267,7 @@ export async function updateStaffAction(
         phone: formData.get("phone") ?? "",
         email: formData.get("email") ?? "",
         position: formData.get("position") ?? "",
-        departmentId: formData.get("departmentId") || null,
+        departmentId: null,
         role: formData.get("role") || target.role,
         hireDate: formData.get("hireDate") ?? "",
       });
@@ -196,9 +279,18 @@ export async function updateStaffAction(
     const data = parsed.data;
     const newRole = data.role as Role;
     assertCanAssignRole(actor, newRole, id);
+    const departmentIds =
+      actor.role === "MANAGER"
+        ? departmentIdsForUser(id)
+        : parseDepartmentIds(
+            formData.get("departmentIds") || formData.get("departmentId"),
+          );
+    if (actor.role !== "MANAGER") {
+      const deptError = unknownDepartmentError(departmentIds);
+      if (deptError) return { ok: false, error: deptError };
+    }
 
     if (actor.role === "MANAGER") {
-      data.departmentId = actor.departmentId;
       if (newRole !== "STAFF") {
         return { ok: false, error: "سرپرست فقط نقش پرسنل را می‌تواند نگه دارد" };
       }
@@ -208,9 +300,7 @@ export async function updateStaffAction(
       return { ok: false, error: "نمی‌توانید نقش خود را تغییر دهید" };
     }
 
-    const oldDeptId = target.departmentId;
-    const newDeptId = data.departmentId ?? null;
-    const deptChanged = oldDeptId !== newDeptId;
+    const previousIds = departmentIdsForUser(id);
 
     db.update(users)
       .set({
@@ -220,7 +310,6 @@ export async function updateStaffAction(
         phone: data.phone || null,
         email: data.email || null,
         position: data.position || null,
-        departmentId: newDeptId,
         role: newRole,
         hireDate: data.hireDate || null,
         updatedAt: new Date(),
@@ -228,14 +317,7 @@ export async function updateStaffAction(
       .where(eq(users.id, id))
       .run();
 
-    if (deptChanged) {
-      // department_joined_at + پاک‌سازی PENDING دپارتمان قبلی + generate دپارتمان جدید
-      onUserDepartmentChanged({
-        userId: id,
-        oldDepartmentId: oldDeptId,
-        newDepartmentId: newDeptId,
-      });
-    }
+    applyDepartmentMembership(id, departmentIds);
 
     writeAuditLog({
       actorId: actor.id,
@@ -244,8 +326,9 @@ export async function updateStaffAction(
       entityId: id,
       meta: {
         role: newRole,
-        departmentId: data.departmentId,
-        departmentChanged: deptChanged,
+        departmentIds,
+        departmentChanged:
+          previousIds.join(",") !== departmentIds.join(","),
       },
     });
 
@@ -480,16 +563,5 @@ export async function uploadStaffAvatarAction(
 export async function listActiveStaffIdsInDepartment(
   departmentId: number,
 ): Promise<number[]> {
-  return db
-    .select({ id: users.id })
-    .from(users)
-    .where(
-      and(
-        eq(users.departmentId, departmentId),
-        eq(users.isActive, true),
-        isNull(users.deletedAt),
-      ),
-    )
-    .all()
-    .map((r) => r.id);
+  return userIdsInDepartments([departmentId], { activeOnly: true });
 }

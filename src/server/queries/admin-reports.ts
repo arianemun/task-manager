@@ -4,9 +4,16 @@ import {
   departments,
   taskOccurrences,
   taskTemplates,
+  userDepartments,
   users,
 } from "@/db/schema";
 import type { AuthUser } from "@/lib/auth/user";
+import { reasonLabelMap } from "@/lib/settings/not-done-reasons";
+import {
+  departmentNamesForUser,
+  userInDepartmentsSql,
+} from "@/lib/departments/membership";
+import { personalCreditSql } from "@/lib/tasks/group-work";
 import {
   addGregorianDays,
   jalaliWeekday,
@@ -40,11 +47,13 @@ function scopedUserIds(actor: AuthUser, filters: ReportFilters): number[] | null
   const scope = scopeUsersQuery(actor);
   if (scope) conditions.push(scope);
 
-  if (actor.role === "MANAGER" && actor.departmentId) {
-    // MANAGER فقط دپارتمان خود
-    conditions.push(eq(users.departmentId, actor.departmentId));
-  } else if (filters.departmentId) {
-    conditions.push(eq(users.departmentId, filters.departmentId));
+  if (filters.departmentId) {
+    const allowed =
+      actor.role !== "MANAGER" ||
+      actor.departmentIds.includes(filters.departmentId);
+    if (allowed) {
+      conditions.push(userInDepartmentsSql([filters.departmentId]));
+    }
   }
   if (filters.userId) {
     conditions.push(eq(users.id, filters.userId));
@@ -65,12 +74,16 @@ function scopedUserIds(actor: AuthUser, filters: ReportFilters): number[] | null
 function baseOccurrenceWhere(
   actor: AuthUser,
   filters: ReportFilters,
+  options?: { personalCreditOnly?: boolean },
 ): { clauses: SQL[]; userIds: number[] | null } {
   const userIds = scopedUserIds(actor, filters);
   const clauses: SQL[] = [
     sql`${taskOccurrences.periodEnd} >= ${filters.from}`,
     sql`${taskOccurrences.periodEnd} <= ${filters.to}`,
   ];
+  if (options?.personalCreditOnly !== false) {
+    clauses.push(personalCreditSql());
+  }
   if (userIds) {
     if (userIds.length === 0) {
       clauses.push(sql`1 = 0`);
@@ -209,7 +222,8 @@ export function aggregateByStaff(actor: AuthUser, filters: ReportFilters) {
     const cur = map.get(r.userId) ?? {
       userId: r.userId,
       fullName: r.fullName,
-      departmentName: r.departmentName,
+      departmentName:
+        departmentNamesForUser(r.userId) || r.departmentName,
       counts: {},
     };
     cur.counts[r.status as keyof StatusCounts] =
@@ -275,7 +289,7 @@ export function aggregateByDepartment(actor: AuthUser, filters: ReportFilters) {
   const { clauses } = baseOccurrenceWhere(actor, filters);
   const rows = db
     .select({
-      departmentId: users.departmentId,
+      departmentId: sql<number | null>`coalesce(${userDepartments.departmentId}, ${users.departmentId})`,
       departmentName: departments.name,
       status: taskOccurrences.status,
       c: count(),
@@ -283,9 +297,17 @@ export function aggregateByDepartment(actor: AuthUser, filters: ReportFilters) {
     .from(taskOccurrences)
     .innerJoin(taskTemplates, eq(taskOccurrences.templateId, taskTemplates.id))
     .innerJoin(users, eq(taskOccurrences.userId, users.id))
-    .leftJoin(departments, eq(users.departmentId, departments.id))
+    .leftJoin(userDepartments, eq(userDepartments.userId, users.id))
+    .leftJoin(
+      departments,
+      sql`${departments.id} = coalesce(${userDepartments.departmentId}, ${users.departmentId})`,
+    )
     .where(and(...clauses))
-    .groupBy(users.departmentId, departments.name, taskOccurrences.status)
+    .groupBy(
+      sql`coalesce(${userDepartments.departmentId}, ${users.departmentId})`,
+      departments.name,
+      taskOccurrences.status,
+    )
     .all();
 
   const map = new Map<string, { name: string; counts: StatusCounts }>();
@@ -406,6 +428,14 @@ export function aggregateReasons(actor: AuthUser, filters: ReportFilters) {
     .groupBy(taskOccurrences.reasonCode)
     .all();
 
+  const labels = reasonLabelMap();
+  const labeled = byCode.map((row) => ({
+    ...row,
+    reasonLabel: row.reasonCode
+      ? (labels.get(row.reasonCode) ?? row.reasonCode)
+      : null,
+  }));
+
   const recentNotes = db
     .select({
       id: taskOccurrences.id,
@@ -430,7 +460,15 @@ export function aggregateReasons(actor: AuthUser, filters: ReportFilters) {
     .limit(30)
     .all();
 
-  return { byCode, recentNotes };
+  return {
+    byCode: labeled,
+    recentNotes: recentNotes.map((note) => ({
+      ...note,
+      reasonLabel: note.reasonCode
+        ? (labels.get(note.reasonCode) ?? note.reasonCode)
+        : null,
+    })),
+  };
 }
 
 export function staffDayHeatmap(actor: AuthUser, filters: ReportFilters) {
@@ -482,7 +520,9 @@ export function listOccurrenceDetails(
   actor: AuthUser,
   filters: ReportFilters,
 ) {
-  const { clauses } = baseOccurrenceWhere(actor, filters);
+  const { clauses } = baseOccurrenceWhere(actor, filters, {
+    personalCreditOnly: false,
+  });
   const whereParts = [...clauses];
   if (filters.q) {
     const needle = `%${filters.q}%`;
@@ -515,6 +555,7 @@ export function listOccurrenceDetails(
       note: taskOccurrences.note,
       reasonCode: taskOccurrences.reasonCode,
       attachmentPath: taskOccurrences.attachmentPath,
+      completedByUserId: taskOccurrences.completedByUserId,
       fullName: users.fullName,
       userId: users.id,
       title: taskTemplates.title,
@@ -530,9 +571,41 @@ export function listOccurrenceDetails(
     .offset(offset)
     .all();
 
+  const labels = reasonLabelMap();
   const rates = aggregateStatusDonut(actor, filters).rates;
+  const completerIds = [
+    ...new Set(
+      rows
+        .map((row) => row.completedByUserId)
+        .filter((id): id is number => id != null),
+    ),
+  ];
+  const completerNames = new Map(
+    completerIds.length === 0
+      ? []
+      : db
+          .select({ id: users.id, fullName: users.fullName })
+          .from(users)
+          .where(inArray(users.id, completerIds))
+          .all()
+          .map((person) => [person.id, person.fullName] as const),
+  );
 
-  return { rows, total, page: filters.page, pageSize: filters.pageSize, rates };
+  return {
+    rows: rows.map((row) => ({
+      ...row,
+      completedByName: row.completedByUserId
+        ? (completerNames.get(row.completedByUserId) ?? null)
+        : null,
+      reasonLabel: row.reasonCode
+        ? (labels.get(row.reasonCode) ?? row.reasonCode)
+        : null,
+    })),
+    total,
+    page: filters.page,
+    pageSize: filters.pageSize,
+    rates,
+  };
 }
 
 export function loadDashboardKpis(actor: AuthUser) {

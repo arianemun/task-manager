@@ -25,8 +25,8 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const sp = Object.fromEntries(url.searchParams.entries());
     const filters = parseReportFilters(sp);
-    if (actor.role === "MANAGER" && actor.departmentId) {
-      filters.departmentId = actor.departmentId;
+    if (actor.role === "MANAGER" && actor.departmentIds.length === 1) {
+      filters.departmentId = actor.departmentIds[0]!;
     }
     filters.page = 1;
     filters.pageSize = 5000;
@@ -107,6 +107,7 @@ export async function GET(request: Request) {
       { header: "کار", key: "title", width: 28 },
       { header: "پایان دوره (شمسی)", key: "end", width: 16 },
       { header: "وضعیت", key: "status", width: 14 },
+      { header: "ثبت‌کننده", key: "by", width: 22 },
       { header: "دلیل", key: "reason", width: 16 },
       { header: "توضیح", key: "note", width: 32 },
     ];
@@ -118,7 +119,11 @@ export async function GET(request: Request) {
         title: r.title,
         end: toJalali(r.periodEnd).jDate,
         status: fa.status[r.status as keyof typeof fa.status] ?? r.status,
-        reason: r.reasonCode ?? "",
+        by:
+          r.completedByName && r.completedByName !== r.fullName
+            ? r.completedByName
+            : "",
+        reason: r.reasonLabel ?? r.reasonCode ?? "",
         note: r.note ?? "",
       });
     }

@@ -27,4 +27,12 @@ if (!fs.existsSync(standalone)) {
 
 copyDir(staticSrc, path.join(standalone, ".next", "static"));
 copyDir(publicSrc, path.join(standalone, "public"));
+
+for (const name of [".env", ".env.production", ".env.local"]) {
+  const src = path.join(root, name);
+  if (!fs.existsSync(src)) continue;
+  fs.copyFileSync(src, path.join(standalone, name));
+  console.log("✓ کپی", src, "→", path.join(standalone, name));
+}
+
 console.log("standalone آماده است.");

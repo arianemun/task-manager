@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   holidays,
@@ -6,9 +6,11 @@ import {
   taskCategories,
   taskOccurrences,
   taskTemplates,
+  users,
   type OccurrenceStatus,
   type Priority,
 } from "@/db/schema";
+import { groupMemberUserIds } from "@/lib/tasks/group-work";
 import {
   addGregorianDays,
   compareGDate,
@@ -48,6 +50,10 @@ export type MeOccurrence = {
   daysLeft: number;
   group: "today" | "week" | "month";
   locked: boolean;
+  groupTask: boolean;
+  completedByUserId: number | null;
+  completedByName: string | null;
+  fulfilledByOther: boolean;
 };
 
 function sortOcc(a: MeOccurrence, b: MeOccurrence): number {
@@ -76,6 +82,7 @@ export function loadMeToday(userId: number) {
       reasonCode: taskOccurrences.reasonCode,
       attachmentPath: taskOccurrences.attachmentPath,
       editedAt: taskOccurrences.editedAt,
+      completedByUserId: taskOccurrences.completedByUserId,
       title: taskTemplates.title,
       description: taskTemplates.description,
       priority: taskTemplates.priority,
@@ -96,16 +103,46 @@ export function loadMeToday(userId: number) {
     )
     .all();
 
+  const groupCache = new Map<number, Set<number>>();
+  const groupSet = (templateId: number) => {
+    let set = groupCache.get(templateId);
+    if (!set) {
+      set = new Set(groupMemberUserIds(templateId));
+      groupCache.set(templateId, set);
+    }
+    return set;
+  };
+  const completerIds = [
+    ...new Set(
+      rows
+        .map((row) => row.completedByUserId)
+        .filter((id): id is number => id != null),
+    ),
+  ];
+  const completerNames = new Map(
+    completerIds.length === 0
+      ? []
+      : db
+          .select({ id: users.id, fullName: users.fullName })
+          .from(users)
+          .where(inArray(users.id, completerIds))
+          .all()
+          .map((person) => [person.id, person.fullName] as const),
+  );
+
   const todayList: MeOccurrence[] = [];
   const weekList: MeOccurrence[] = [];
   const monthList: MeOccurrence[] = [];
   const excusedList: MeOccurrence[] = [];
 
   for (const r of rows) {
+    const fulfilledByOther =
+      r.completedByUserId != null && r.completedByUserId !== userId;
     const locked =
       compareGDate(r.periodEnd, today) < 0 ||
       r.status === "MISSED" ||
-      r.status === "EXCUSED";
+      r.status === "EXCUSED" ||
+      fulfilledByOther;
     const daysLeft = Math.max(0, diffGregorianDays(today, r.periodEnd));
     const base: MeOccurrence = {
       id: r.id,
@@ -130,6 +167,13 @@ export function loadMeToday(userId: number) {
       daysLeft,
       group: "today",
       locked,
+      groupTask:
+        groupSet(r.templateId).has(userId) || r.completedByUserId != null,
+      completedByUserId: r.completedByUserId,
+      completedByName: r.completedByUserId
+        ? (completerNames.get(r.completedByUserId) ?? null)
+        : null,
+      fulfilledByOther,
     };
 
     if (r.status === "EXCUSED") {
@@ -156,10 +200,11 @@ export function loadMeToday(userId: number) {
   weekList.sort(sortOcc);
   monthList.sort(sortOcc);
 
-  const doneToday = todayList.filter(
+  const ownToday = todayList.filter((o) => !o.fulfilledByOther);
+  const doneToday = ownToday.filter(
     (o) => o.status === "DONE" || o.status === "DONE_LATE",
   );
-  const progressTotal = todayList.filter((o) => o.status !== "EXCUSED").length;
+  const progressTotal = ownToday.filter((o) => o.status !== "EXCUSED").length;
   const progressDone = doneToday.length;
 
   const onLeave = isUserOnLeave(userId, today);

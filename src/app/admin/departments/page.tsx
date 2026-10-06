@@ -18,8 +18,8 @@ export default async function DepartmentsPage() {
     forbiddenPath: "/me",
   });
   let rows = listAllDepartments();
-  if (actor.role === "MANAGER" && actor.departmentId) {
-    rows = rows.filter((d) => d.id === actor.departmentId);
+  if (actor.role === "MANAGER") {
+    rows = rows.filter((d) => actor.departmentIds.includes(d.id));
   }
 
   return (

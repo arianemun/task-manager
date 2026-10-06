@@ -33,7 +33,9 @@ export default async function TasksPage({ searchParams }: Props) {
   const departments =
     actor.role === "ADMIN"
       ? listDepartmentsSimple()
-      : listDepartmentsSimple().filter((d) => d.id === actor.departmentId);
+      : listDepartmentsSimple().filter((d) =>
+          actor.departmentIds.includes(d.id),
+        );
 
   const rows = listTasksForActor(actor, {
     q: sp.q,

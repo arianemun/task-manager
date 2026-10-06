@@ -96,18 +96,18 @@ export function JalaliDatePicker({
       {isDesktop ? (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          <PopoverContent className="w-80 p-0" align="start">
             {calendar}
           </PopoverContent>
         </Popover>
       ) : (
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>{trigger}</DrawerTrigger>
-          <DrawerContent className="pb-[env(safe-area-inset-bottom)]">
-            <DrawerHeader>
+          <DrawerContent className="h-auto pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            <DrawerHeader className="px-4 py-2">
               <DrawerTitle>{label ?? "انتخاب تاریخ"}</DrawerTitle>
             </DrawerHeader>
-            <div className="flex justify-center px-2 pb-4">{calendar}</div>
+            <div className="px-2 pb-2">{calendar}</div>
           </DrawerContent>
         </Drawer>
       )}
@@ -231,11 +231,11 @@ export function JalaliDateRangePicker({
       ) : (
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>{trigger}</DrawerTrigger>
-          <DrawerContent className="max-h-[92dvh] pb-[env(safe-area-inset-bottom)]">
-            <DrawerHeader>
+          <DrawerContent className="h-auto max-h-[92dvh] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            <DrawerHeader className="px-4 py-2">
               <DrawerTitle>{label ?? "انتخاب بازه"}</DrawerTitle>
             </DrawerHeader>
-            <div className="overflow-y-auto px-2 pb-4">{body}</div>
+            <div className="overflow-y-auto px-2 pb-2">{body}</div>
           </DrawerContent>
         </Drawer>
       )}
@@ -316,11 +316,11 @@ export function JalaliMultiDatePicker({
       ) : (
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>{trigger}</DrawerTrigger>
-          <DrawerContent className="pb-[env(safe-area-inset-bottom)]">
-            <DrawerHeader>
+          <DrawerContent className="h-auto pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            <DrawerHeader className="px-4 py-2">
               <DrawerTitle>{label ?? "انتخاب تاریخ‌ها"}</DrawerTitle>
             </DrawerHeader>
-            <div className="flex justify-center px-2 pb-2">{calendar}</div>
+            <div className="px-2 pb-2">{calendar}</div>
             <div className="border-t p-3">
               <Button
                 type="button"

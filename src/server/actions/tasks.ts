@@ -1,15 +1,15 @@
 "use server";
 
-import { and, count, eq, isNull } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
   taskAssignments,
   taskOccurrences,
   taskTemplates,
-  users,
 } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
+import { activeMembersOfDepartment } from "@/lib/departments/membership";
 import { isAuthError } from "@/lib/auth/errors";
 import { requirePermission, requireUser } from "@/lib/auth/user";
 import {
@@ -86,17 +86,9 @@ function syncAssignments(
   // کاربرانی که دیگر نه مستقیم و نه از دپارتمان پوشش داده نمی‌شوند
   const stillCovered = new Set<number>();
   for (const departmentId of departmentIds) {
-    db.select({ id: users.id })
-      .from(users)
-      .where(
-        and(
-          eq(users.departmentId, departmentId),
-          eq(users.isActive, true),
-          isNull(users.deletedAt),
-        ),
-      )
-      .all()
-      .forEach((u) => stillCovered.add(u.id));
+    activeMembersOfDepartment(departmentId).forEach((member) =>
+      stillCovered.add(member.user.id),
+    );
   }
   userIds.forEach((id) => stillCovered.add(id));
 
@@ -118,7 +110,9 @@ export async function createTaskAction(
     }
     const data = parsed.data;
     if (actor.role === "MANAGER") {
-      data.departmentIds = actor.departmentId ? [actor.departmentId] : [];
+      data.departmentIds = data.departmentIds.filter((id) =>
+        actor.departmentIds.includes(id),
+      );
     }
     assertAssigneeInScope(actor, data.userIds, data.departmentIds);
 
@@ -186,7 +180,9 @@ export async function updateTaskAction(
     }
     const data = parsed.data;
     if (actor.role === "MANAGER") {
-      data.departmentIds = actor.departmentId ? [actor.departmentId] : [];
+      data.departmentIds = data.departmentIds.filter((id) =>
+        actor.departmentIds.includes(id),
+      );
     }
     assertAssigneeInScope(actor, data.userIds, data.departmentIds);
 
@@ -273,11 +269,9 @@ export async function archiveTaskAction(
     for (const a of assignees) {
       if (a.userId) userIds.add(a.userId);
       if (a.departmentId) {
-        db.select({ id: users.id })
-          .from(users)
-          .where(eq(users.departmentId, a.departmentId))
-          .all()
-          .forEach((u) => userIds.add(u.id));
+        activeMembersOfDepartment(a.departmentId).forEach((member) =>
+          userIds.add(member.user.id),
+        );
       }
     }
     removePendingOnUnassign({ templateId: id, userIds: [...userIds] });
@@ -333,17 +327,9 @@ export async function countUniqueAssigneesAction(
   await requireUser({ roles: ["ADMIN", "MANAGER"] });
   const set = new Set(userIds);
   for (const departmentId of departmentIds) {
-    db.select({ id: users.id })
-      .from(users)
-      .where(
-        and(
-          eq(users.departmentId, departmentId),
-          eq(users.isActive, true),
-          isNull(users.deletedAt),
-        ),
-      )
-      .all()
-      .forEach((u) => set.add(u.id));
+    activeMembersOfDepartment(departmentId).forEach((member) =>
+      set.add(member.user.id),
+    );
   }
   return set.size;
 }

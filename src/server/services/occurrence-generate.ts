@@ -7,6 +7,7 @@ import {
   taskAssignments,
   taskOccurrences,
   taskTemplates,
+  userDepartments,
   users,
 } from "@/db/schema";
 import {
@@ -19,12 +20,14 @@ import {
   todayTehran,
   type GDate,
 } from "@/lib/dates";
+import { activeMembersOfDepartment } from "@/lib/departments/membership";
 import {
   earliestEligibleStart,
   getOccurrencesInRange,
   type RecurrenceConfig,
   type RecurrenceTemplateInput,
 } from "@/lib/recurrence";
+import { syncPendingGroupClosures } from "@/server/services/group-completion";
 
 const LAST_GEN_KEY = "last_occurrence_generated_date";
 export const MAX_CATCHUP_DAYS = 62;
@@ -119,12 +122,16 @@ export function resolveCatchupRange(today: GDate): { from: GDate; to: GDate } {
   return { from, to: today };
 }
 
+type DeptPath = {
+  assignDate: GDate;
+  joinedAt: GDate | null;
+};
+
 type Assignee = {
   userId: number;
   hireDate: GDate | null;
-  departmentJoinedAt: GDate | null;
   userAssignDate: GDate | null;
-  deptAssignDate: GDate | null;
+  deptPaths: DeptPath[];
 };
 
 function resolveAssignees(templateId: number): Assignee[] {
@@ -142,9 +149,8 @@ function resolveAssignees(templateId: number): Assignee[] {
       a = {
         userId,
         hireDate: u.hireDate,
-        departmentJoinedAt: u.departmentJoinedAt,
         userAssignDate: null,
-        deptAssignDate: null,
+        deptPaths: [],
       };
       map.set(userId, a);
     }
@@ -168,22 +174,13 @@ function resolveAssignees(templateId: number): Assignee[] {
     }
 
     if (a.assigneeType === "DEPARTMENT" && a.departmentId) {
-      const members = db
-        .select()
-        .from(users)
-        .where(
-          and(
-            eq(users.departmentId, a.departmentId),
-            eq(users.isActive, true),
-            isNull(users.deletedAt),
-          ),
-        )
-        .all();
-      for (const u of members) {
-        const entry = ensure(u.id, u);
-        entry.deptAssignDate = entry.deptAssignDate
-          ? minGDate(entry.deptAssignDate, assignmentCreatedDate)
-          : assignmentCreatedDate;
+      const members = activeMembersOfDepartment(a.departmentId);
+      for (const member of members) {
+        const entry = ensure(member.user.id, member.user);
+        entry.deptPaths.push({
+          assignDate: assignmentCreatedDate,
+          joinedAt: member.joinedAt,
+        });
       }
     }
   }
@@ -209,12 +206,12 @@ function assigneeEffectiveStart(
       hireDate: assignee.hireDate,
     });
   }
-  if (assignee.deptAssignDate) {
+  for (const path of assignee.deptPaths) {
     paths.push({
       templateStart,
-      assignmentCreatedDate: assignee.deptAssignDate,
+      assignmentCreatedDate: path.assignDate,
       hireDate: assignee.hireDate,
-      departmentJoinedAt: assignee.departmentJoinedAt,
+      departmentJoinedAt: path.joinedAt,
     });
   }
   if (paths.length === 0) {
@@ -369,6 +366,7 @@ export function generateOccurrences(options?: {
   }
 
   const inserted = insertBatch(allRows);
+  syncPendingGroupClosures(templates.map((template) => template.id));
 
   if (
     !options?.skipCursorUpdate &&
@@ -401,6 +399,7 @@ export function lazyGenerateForUser(userId: number): GenerateResult {
 }
 
 export function closeMissedPeriods(): CloseResult {
+  syncPendingGroupClosures();
   const today = todayTehran();
   const result = db
     .update(taskOccurrences)
@@ -508,6 +507,27 @@ export function onUserDepartmentChanged(input: {
     })
     .where(eq(users.id, input.userId))
     .run();
+
+  if (input.oldDepartmentId != null) {
+    db.delete(userDepartments)
+      .where(
+        and(
+          eq(userDepartments.userId, input.userId),
+          eq(userDepartments.departmentId, input.oldDepartmentId),
+        ),
+      )
+      .run();
+  }
+  if (input.newDepartmentId != null) {
+    db.insert(userDepartments)
+      .values({
+        userId: input.userId,
+        departmentId: input.newDepartmentId,
+        joinedAt: today,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
 
   let removed = 0;
   if (input.oldDepartmentId != null) {

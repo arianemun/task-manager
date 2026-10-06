@@ -13,6 +13,7 @@ function Switch({
 }) {
   return (
     <SwitchPrimitive.Root
+      dir="ltr"
       data-slot="switch"
       data-size={size}
       className={cn(

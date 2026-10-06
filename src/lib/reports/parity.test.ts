@@ -157,6 +157,7 @@ describe("parity me ↔ admin rates", () => {
       fullName: "ا",
       role: "ADMIN" as const,
       departmentId: null,
+      departmentIds: [],
       isActive: true,
       mustChangePassword: false,
       sessionVersion: 1,

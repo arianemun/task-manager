@@ -1,8 +1,13 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { taskAssignments, taskTemplates, users } from "@/db/schema";
+import { taskAssignments, taskTemplates } from "@/db/schema";
 import { AuthError } from "@/lib/auth/errors";
 import type { AuthUser } from "@/lib/auth/user";
+import {
+  departmentIdsForUser,
+  sharesDepartment,
+  userIdsInDepartments,
+} from "@/lib/departments/membership";
 
 /** آیا همه گیرنده‌های کار در محدوده MANAGER هستند؟ */
 export function canManagerEditTemplate(
@@ -10,7 +15,7 @@ export function canManagerEditTemplate(
   templateId: number,
 ): boolean {
   if (actor.role === "ADMIN") return true;
-  if (actor.role !== "MANAGER" || !actor.departmentId) return false;
+  if (actor.role !== "MANAGER" || actor.departmentIds.length === 0) return false;
 
   const assignments = db
     .select()
@@ -22,10 +27,13 @@ export function canManagerEditTemplate(
 
   for (const a of assignments) {
     if (a.assigneeType === "DEPARTMENT") {
-      if (a.departmentId !== actor.departmentId) return false;
+      if (!a.departmentId || !actor.departmentIds.includes(a.departmentId)) {
+        return false;
+      }
     } else if (a.userId) {
-      const u = db.select().from(users).where(eq(users.id, a.userId)).get();
-      if (!u || u.departmentId !== actor.departmentId) return false;
+      if (!sharesDepartment(actor.departmentIds, departmentIdsForUser(a.userId))) {
+        return false;
+      }
     }
   }
   return true;
@@ -49,15 +57,9 @@ export function templatesVisibleToActor(actor: AuthUser): number[] {
       .all()
       .map((t) => t.id);
   }
-  if (actor.role !== "MANAGER" || !actor.departmentId) return [];
+  if (actor.role !== "MANAGER" || actor.departmentIds.length === 0) return [];
 
-  const deptId = actor.departmentId;
-  const staffIds = db
-    .select({ id: users.id })
-    .from(users)
-    .where(and(eq(users.departmentId, deptId), isNull(users.deletedAt)))
-    .all()
-    .map((u) => u.id);
+  const staffIds = userIdsInDepartments(actor.departmentIds);
 
   const byDept = db
     .select({ templateId: taskAssignments.templateId })
@@ -65,7 +67,7 @@ export function templatesVisibleToActor(actor: AuthUser): number[] {
     .where(
       and(
         eq(taskAssignments.assigneeType, "DEPARTMENT"),
-        eq(taskAssignments.departmentId, deptId),
+        inArray(taskAssignments.departmentId, actor.departmentIds),
       ),
     )
     .all()
@@ -95,18 +97,17 @@ export function assertAssigneeInScope(
   departmentIds: number[],
 ) {
   if (actor.role === "ADMIN") return;
-  if (actor.role !== "MANAGER" || !actor.departmentId) {
+  if (actor.role !== "MANAGER" || actor.departmentIds.length === 0) {
     throw new AuthError("FORBIDDEN", "دسترسی ندارید");
   }
-  if (departmentIds.some((d) => d !== actor.departmentId)) {
+  if (departmentIds.some((d) => !actor.departmentIds.includes(d))) {
     throw new AuthError(
       "FORBIDDEN",
       "سرپرست فقط دپارتمان خودش را می‌تواند انتخاب کند",
     );
   }
   for (const uid of userIds) {
-    const u = db.select().from(users).where(eq(users.id, uid)).get();
-    if (!u || u.departmentId !== actor.departmentId) {
+    if (!sharesDepartment(actor.departmentIds, departmentIdsForUser(uid))) {
       throw new AuthError(
         "FORBIDDEN",
         "سرپرست فقط به پرسنل دپارتمان خودش اساین می‌کند",

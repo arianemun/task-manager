@@ -2,7 +2,7 @@ import { TodayBoard } from "@/components/me/today-board";
 import { requireUserOrRedirect } from "@/lib/auth/redirect";
 import { jalaliWeekday, toJalali, todayTehran } from "@/lib/dates";
 import { fa } from "@/lib/i18n/fa";
-import { getNotDoneReasons } from "@/lib/settings/not-done-reasons";
+import { getNotDoneReasonsForDepartments } from "@/lib/settings/not-done-reasons";
 import { toFaDigits } from "@/lib/utils";
 import { listAnnouncementsForStaff } from "@/server/queries/announcements";
 import { loadMeReport } from "@/server/queries/me-report";
@@ -17,7 +17,7 @@ export default async function MeTodayPage() {
 
   const data = loadMeToday(user.id);
   const report = loadMeReport(user.id);
-  const reasons = getNotDoneReasons();
+  const reasons = getNotDoneReasonsForDepartments(user.departmentIds);
   const today = todayTehran();
   const j = toJalali(today);
   const wd = jalaliWeekday(today);

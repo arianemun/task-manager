@@ -7,6 +7,7 @@ import {
   type Role,
   type User,
 } from "@/db/schema";
+import { departmentIdsForUser } from "@/lib/departments/membership";
 import { resolvePermissions } from "@/lib/permissions";
 import { AuthError } from "./errors";
 import { getSessionPayload } from "./session";
@@ -17,6 +18,7 @@ export type AuthUser = {
   fullName: string;
   role: Role;
   departmentId: number | null;
+  departmentIds: number[];
   isActive: boolean;
   mustChangePassword: boolean;
   sessionVersion: number;
@@ -31,6 +33,7 @@ function toAuthUser(row: User, permissions: Permission[]): AuthUser {
     fullName: row.fullName,
     role: row.role,
     departmentId: row.departmentId,
+    departmentIds: departmentIdsForUser(row.id),
     isActive: row.isActive,
     mustChangePassword: row.mustChangePassword,
     sessionVersion: row.sessionVersion,

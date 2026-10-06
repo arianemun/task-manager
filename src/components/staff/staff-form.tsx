@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { DepartmentChips } from "@/components/reasons/department-chips";
 import { PasswordRevealDialog } from "@/components/staff/password-reveal-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,6 +66,7 @@ type Props = {
     email: string | null;
     position: string | null;
     departmentId: number | null;
+    departmentIds?: number[];
     role: Role;
     hireDate: string | null;
     permissions: Permission[];
@@ -83,7 +85,7 @@ const staffFormSchema = z.object({
     .optional()
     .or(z.literal("")),
   position: z.string().trim().max(120).optional().or(z.literal("")),
-  departmentId: z.string().optional(),
+  departmentIds: z.array(z.number()),
   role: z.enum(["ADMIN", "MANAGER", "STAFF"]),
   hireDate: z.string().trim().optional().or(z.literal("")),
   permissions: z.array(z.string()),
@@ -112,11 +114,9 @@ export function StaffForm({ mode, departments, actorRole, initial }: Props) {
       phone: initial?.phone ?? "",
       email: initial?.email ?? "",
       position: initial?.position ?? "",
-      departmentId: initial?.departmentId
-        ? String(initial.departmentId)
-        : canPickDept
-          ? ""
-          : String(departments[0]?.id ?? ""),
+      departmentIds:
+        initial?.departmentIds ??
+        (initial?.departmentId ? [initial.departmentId] : []),
       role: initial?.role ?? "STAFF",
       hireDate: initial?.hireDate ?? "",
       permissions: initial?.permissions ?? [],
@@ -147,10 +147,8 @@ export function StaffForm({ mode, departments, actorRole, initial }: Props) {
     fd.set("email", values.email ?? "");
     fd.set("position", values.position ?? "");
     fd.set(
-      "departmentId",
-      canPickDept
-        ? values.departmentId || ""
-        : String(departments[0]?.id ?? ""),
+      "departmentIds",
+      JSON.stringify(canPickDept ? values.departmentIds : []),
     );
     fd.set("role", canPickRole ? values.role : "STAFF");
     fd.set("hireDate", values.hireDate ?? "");
@@ -285,31 +283,18 @@ export function StaffForm({ mode, departments, actorRole, initial }: Props) {
               {canPickDept ? (
                 <FormField
                   control={form.control}
-                  name="departmentId"
+                  name="departmentIds"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>دپارتمان</FormLabel>
-                      <Select
-                        value={field.value || "__none__"}
-                        onValueChange={(v) =>
-                          field.onChange(v === "__none__" ? "" : v)
-                        }
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>دپارتمان‌ها</FormLabel>
+                      <DepartmentChips
+                        departments={departments}
+                        selected={field.value}
+                        onChange={field.onChange}
                         disabled={pending}
-                      >
-                        <FormControl>
-                          <SelectTrigger aria-label="دپارتمان">
-                            <SelectValue placeholder="انتخاب دپارتمان" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="__none__">—</SelectItem>
-                          {departments.map((d) => (
-                            <SelectItem key={d.id} value={String(d.id)}>
-                              {d.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        emptyHint="بدون دپارتمان، کار دپارتمانی برای این پرسنل ساخته نمی‌شود."
+                        selectedHint="پرسنل در همه دپارتمان‌های انتخاب‌شده عضو می‌شود و کارهای آن‌ها را می‌بیند."
+                      />
                       <FormMessage />
                     </FormItem>
                   )}

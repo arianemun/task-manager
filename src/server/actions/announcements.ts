@@ -11,6 +11,7 @@ import {
   users,
 } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
+import { userIdsInDepartments } from "@/lib/departments/membership";
 import { isAuthError } from "@/lib/auth/errors";
 import { requirePermission, requireUser } from "@/lib/auth/user";
 import type { ActionResult } from "./auth";
@@ -47,11 +48,16 @@ export async function createAnnouncementAction(
 
     const data = parsed.data;
     if (actor.role === "MANAGER") {
-      if (!actor.departmentId) {
+      if (actor.departmentIds.length === 0) {
         return { ok: false, error: "دپارتمان سرپرست مشخص نیست" };
       }
       data.audience = "DEPARTMENT";
-      data.departmentId = actor.departmentId;
+      if (
+        !data.departmentId ||
+        !actor.departmentIds.includes(data.departmentId)
+      ) {
+        data.departmentId = actor.departmentIds[0]!;
+      }
     }
 
     if (data.audience === "DEPARTMENT" && !data.departmentId) {
@@ -120,7 +126,7 @@ export async function deleteAnnouncementAction(
 
     if (
       actor.role === "MANAGER" &&
-      ann.departmentId !== actor.departmentId
+      (!ann.departmentId || !actor.departmentIds.includes(ann.departmentId))
     ) {
       return { ok: false, error: "دسترسی به این اطلاعیه ندارید" };
     }
@@ -197,12 +203,7 @@ export async function getAnnouncementReadStats(announcementId: number): Promise<
       .all()
       .map((u) => u.id);
   } else if (ann.audience === "DEPARTMENT" && ann.departmentId) {
-    audienceUserIds = db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.departmentId, ann.departmentId))
-      .all()
-      .map((u) => u.id);
+    audienceUserIds = userIdsInDepartments([ann.departmentId]);
   } else {
     audienceUserIds = db
       .select({ userId: announcementTargets.userId })
@@ -212,15 +213,8 @@ export async function getAnnouncementReadStats(announcementId: number): Promise<
       .map((t) => t.userId);
   }
 
-  if (actor.role === "MANAGER" && actor.departmentId) {
-    const deptIds = new Set(
-      db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.departmentId, actor.departmentId))
-        .all()
-        .map((u) => u.id),
-    );
+  if (actor.role === "MANAGER" && actor.departmentIds.length > 0) {
+    const deptIds = new Set(userIdsInDepartments(actor.departmentIds));
     audienceUserIds = audienceUserIds.filter((id) => deptIds.has(id));
   }
 

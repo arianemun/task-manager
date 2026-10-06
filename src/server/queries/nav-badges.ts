@@ -9,6 +9,7 @@ import {
   users,
 } from "@/db/schema";
 import type { AuthUser } from "@/lib/auth/user";
+import { userInDepartmentsSql } from "@/lib/departments/membership";
 import { todayTehran } from "@/lib/dates";
 
 /**
@@ -71,7 +72,10 @@ function countUnreadAnnouncementsFast(actor: AuthUser): number {
       continue;
     }
     if (a.audience === "DEPARTMENT") {
-      if (a.departmentId != null && a.departmentId === actor.departmentId) {
+      if (
+        a.departmentId != null &&
+        actor.departmentIds.includes(a.departmentId)
+      ) {
         n += 1;
       }
       continue;
@@ -92,8 +96,8 @@ function countUnansweredTodayFast(actor: AuthUser): number {
     isNull(users.deletedAt),
     inArray(users.role, ["STAFF", "MANAGER"]),
   ];
-  if (actor.role === "MANAGER" && actor.departmentId) {
-    conditions.push(eq(users.departmentId, actor.departmentId));
+  if (actor.role === "MANAGER" && actor.departmentIds.length > 0) {
+    conditions.push(userInDepartmentsSql(actor.departmentIds));
   }
 
   const staffIds = db

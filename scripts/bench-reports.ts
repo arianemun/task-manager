@@ -35,6 +35,7 @@ function actorAdmin(): AuthUser {
     fullName: admin.fullName,
     role: "ADMIN",
     departmentId: admin.departmentId,
+    departmentIds: admin.departmentId ? [admin.departmentId] : [],
     isActive: true,
     mustChangePassword: false,
     sessionVersion: admin.sessionVersion,

@@ -14,6 +14,7 @@ import {
   excuseOccurrencesInRange,
   generateOccurrences,
 } from "@/server/services/occurrence-generate";
+import { recordGroupOutcome } from "@/server/services/group-completion";
 import type { ActionResult } from "./auth";
 
 const statusSchema = z.enum([
@@ -55,18 +56,57 @@ export async function updateOccurrenceStatusAction(
     assertUserInScope(actor, occ.userId);
 
     const prev = occ.status;
-    db.update(taskOccurrences)
-      .set({
+    const closing =
+      status === "DONE" || status === "DONE_LATE" || status === "NOT_DONE";
+    if (closing) {
+      const group = recordGroupOutcome({
+        templateId: occ.templateId,
+        periodKey: occ.periodKey,
+        completerUserId: occ.userId,
+        sourceOccurrenceId: occurrenceId,
         status,
-        note: reason,
         completedAt:
           status === "DONE" || status === "DONE_LATE"
             ? (occ.completedAt ?? new Date())
-            : occ.completedAt,
-        updatedAt: new Date(),
-      })
-      .where(eq(taskOccurrences.id, occurrenceId))
-      .run();
+            : new Date(),
+        note: reason,
+        reasonCode: status === "NOT_DONE" ? occ.reasonCode : null,
+        attachmentPath: occ.attachmentPath,
+        editedAt: occ.editedAt,
+      });
+      if (group.mode === "blocked") {
+        return {
+          ok: false,
+          error: `این کار گروهی را ${group.name} ثبت کرده است`,
+        };
+      }
+      if (group.mode === "personal") {
+        db.update(taskOccurrences)
+          .set({
+            status,
+            note: reason,
+            completedAt:
+              status === "DONE" || status === "DONE_LATE"
+                ? (occ.completedAt ?? new Date())
+                : occ.completedAt,
+            updatedAt: new Date(),
+          })
+          .where(eq(taskOccurrences.id, occurrenceId))
+          .run();
+      }
+    } else {
+      db.update(taskOccurrences)
+        .set({
+          status,
+          note: reason,
+          completedAt: occ.completedAt,
+          completedByUserId:
+            status === "PENDING" ? null : occ.completedByUserId,
+          updatedAt: new Date(),
+        })
+        .where(eq(taskOccurrences.id, occurrenceId))
+        .run();
+    }
 
     writeAuditLog({
       actorId: actor.id,

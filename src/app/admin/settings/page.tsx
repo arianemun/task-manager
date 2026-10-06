@@ -1,6 +1,7 @@
-﻿import { NotDoneReasonsForm } from "@/components/settings/not-done-reasons-form";
+﻿import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Stack } from "@/components/layout/stack";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -11,17 +12,15 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireUserOrRedirect } from "@/lib/auth/redirect";
 import { fa } from "@/lib/i18n/fa";
-import { getNotDoneReasons } from "@/lib/settings/not-done-reasons";
 
 export default async function AdminSettingsPage() {
   await requireUserOrRedirect({ roles: ["ADMIN"], forbiddenPath: "/admin" });
-  const reasons = getNotDoneReasons();
 
   return (
     <Stack>
       <PageHeader
         title={fa.nav.settings}
-        description="تنظیمات سامانه — دلایل آماده «انجام نشد»"
+        description="تنظیمات سامانه"
       />
 
       <Tabs defaultValue="reasons" className="w-full">
@@ -38,12 +37,13 @@ export default async function AdminSettingsPage() {
             <CardHeader>
               <CardTitle className="text-base">دلایل انجام‌نشدن</CardTitle>
               <CardDescription>
-                این chipها در پنل پرسنل هنگام ثبت «انجام نشد» نمایش داده می‌شوند.
-                کدها برای گزارش‌گیری فاز ۷ نگه داشته می‌شوند.
+                افزودن، ویرایش و تخصیص دلیل به دپارتمان از بخش جدا انجام می‌شود.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <NotDoneReasonsForm initialReasons={reasons} />
+              <Button asChild>
+                <Link href="/admin/reasons">{fa.nav.reasons}</Link>
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
