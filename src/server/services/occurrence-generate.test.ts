@@ -231,7 +231,7 @@ describe("تولید occurrence — DB", () => {
     );
     const start = dates.fromJalali(1404, 1, 1);
     const assignMs = fromZonedTime(`${start}T12:00:00`, "Asia/Tehran").getTime();
-    const { db, schema, staffId, templateId } = await seedBase({
+    const { db, schema, staffId, templateId, deptId } = await seedBase({
       assignMs,
       startDate: start,
     });
@@ -251,6 +251,7 @@ describe("تولید occurrence — DB", () => {
         periodKey: "D:done-keep",
         periodStart: todayJ,
         periodEnd: todayJ,
+        sourceDepartmentId: deptId,
         status: "DONE",
         completedAt: new Date(),
         note: null,
@@ -263,6 +264,7 @@ describe("تولید occurrence — DB", () => {
         periodKey: "D:notdone-keep",
         periodStart: todayJ,
         periodEnd: todayJ,
+        sourceDepartmentId: deptId,
         status: "NOT_DONE",
         note: "دلیل",
       })

@@ -7,9 +7,10 @@
  * proposed همان قاعدهٔ resolveOccurrenceSource است و تا تأیید نوشته نمی‌شود.
  */
 import "dotenv/config";
-import { asc } from "drizzle-orm";
+import { asc, eq, isNull } from "drizzle-orm";
 import { db } from "../src/db";
 import {
+  auditLogs,
   departments,
   taskAssignments,
   taskOccurrences,
@@ -24,6 +25,16 @@ import {
 } from "../src/lib/tasks/source-backfill";
 
 const SAMPLE_LIMIT = 20;
+
+/** نسبت‌هایی که برای این پایگاه تأیید شده‌اند. --apply جز این نقشه چیزی نمی‌نویسد. */
+const CONFIRMED: Readonly<Record<number, number>> = {
+  1: 1,
+  2: 1,
+  3: 1,
+  74: 1,
+  93: 3,
+  149: 3,
+};
 
 const occurrenceRows = db
   .select({
@@ -108,6 +119,7 @@ let ambiguous = 0;
 let alreadySet = 0;
 const definiteSamples: string[] = [];
 const ambiguousSamples: string[] = [];
+const proposed = new Map<number, number>();
 
 for (const occurrence of occurrenceRows) {
   if (occurrence.sourceDepartmentId != null) {
@@ -152,8 +164,9 @@ for (const occurrence of occurrenceRows) {
     `proposed=${verdict.proposedDepartmentId == null ? "-" : deptLabel(verdict.proposedDepartmentId)}`,
     verdict.reason,
   ].join(" | ");
-  if (verdict.kind === "definite") {
+  if (verdict.kind === "definite" && verdict.sourceDepartmentId != null) {
     definite += 1;
+    proposed.set(occurrence.id, verdict.sourceDepartmentId);
     if (definiteSamples.length < SAMPLE_LIMIT) definiteSamples.push(line);
     continue;
   }
@@ -184,3 +197,55 @@ if (ambiguousSamples.length === 0) {
 }
 lines.push("");
 process.stdout.write(`${lines.join("\n")}\n`);
+
+if (process.argv.includes("--apply")) {
+  const expectedIds = Object.keys(CONFIRMED).map(Number).sort((a, b) => a - b);
+  const actualIds = [...proposed.keys()].sort((a, b) => a - b);
+  const sameIds =
+    expectedIds.length === actualIds.length &&
+    expectedIds.every((id, index) => id === actualIds[index]);
+  const sameSources = sameIds && expectedIds.every((id) => proposed.get(id) === CONFIRMED[id]);
+  if (!sameIds || !sameSources || ambiguous !== 0 || alreadySet !== 0) {
+    process.stderr.write(
+      "نوشتن لغو شد: نتیجه با نقشه تأییدشده یکی نیست یا ردیف مبهم/ازقبل‌پر وجود دارد.\n",
+    );
+    process.exit(1);
+  }
+
+  db.transaction((tx) => {
+    for (const id of expectedIds) {
+      const sourceDepartmentId = CONFIRMED[id]!;
+      const updated = tx
+        .update(taskOccurrences)
+        .set({ sourceDepartmentId, updatedAt: new Date() })
+        .where(eq(taskOccurrences.id, id))
+        .run();
+      if (updated.changes !== 1) {
+        throw new Error(`ردیف ${id} به‌روز نشد`);
+      }
+    }
+    const remaining = tx
+      .select({ id: taskOccurrences.id })
+      .from(taskOccurrences)
+      .where(isNull(taskOccurrences.sourceDepartmentId))
+      .all();
+    if (remaining.length > 0) {
+      throw new Error("هنوز occurrence بدون منبع مانده است");
+    }
+    tx.insert(auditLogs)
+      .values({
+        actorId: null,
+        action: "occurrence.source_backfill",
+        entity: "task_occurrence",
+        entityId: null,
+        meta: {
+          rows: expectedIds.map((id) => ({
+            id,
+            sourceDepartmentId: CONFIRMED[id],
+          })),
+        },
+      })
+      .run();
+  });
+  process.stdout.write(`نوشته شد: ${expectedIds.length} ردیف در یک transaction.\n`);
+}

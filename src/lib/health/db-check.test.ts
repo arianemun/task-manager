@@ -122,6 +122,8 @@ describe("بررسی سلامت داده", () => {
         mustChangePassword: false,
         isActive: true,
         hireDate: "2026-01-01",
+        departmentId: dept.id,
+        departmentJoinedAt: "2026-01-01",
       })
       .returning({ id: schema.users.id })
       .get();
@@ -159,6 +161,17 @@ describe("بررسی سلامت داده", () => {
     sourceDepartmentId?: number | null;
   }) {
     const period = input.period ?? "2026-10-01";
+    const sourceDepartmentId =
+      input.sourceDepartmentId !== undefined
+        ? input.sourceDepartmentId
+        : db
+            .select({ departmentId: schema.users.departmentId })
+            .from(schema.users)
+            .where(eq(schema.users.id, input.userId))
+            .get()?.departmentId;
+    if (sourceDepartmentId == null) {
+      throw new Error("occurrence آزمایشی دپارتمان منبع ندارد");
+    }
     return db
       .insert(schema.taskOccurrences)
       .values({
@@ -167,6 +180,7 @@ describe("بررسی سلامت داده", () => {
         periodKey: `D:${period}`,
         periodStart: period,
         periodEnd: period,
+        sourceDepartmentId,
         status: input.status ?? "DONE",
         completedAt:
           input.completedAt === undefined
@@ -175,7 +189,6 @@ describe("بررسی سلامت داده", () => {
         completedByUserId: input.completedByUserId,
         doneByOccurrenceId: input.doneByOccurrenceId,
         createdAt: input.createdAt,
-        sourceDepartmentId: input.sourceDepartmentId,
       })
       .returning({ id: schema.taskOccurrences.id })
       .get();
@@ -528,10 +541,16 @@ describe("بررسی سلامت داده", () => {
       ])
       .run();
     const template = seedTemplate(admin.id);
+    const stranger = db
+      .insert(schema.departments)
+      .values({ name: "بیگانه" })
+      .returning({ id: schema.departments.id })
+      .get();
     const missing = occ({
       templateId: template.id,
       userId: staff.id,
       period: "2026-09-01",
+      sourceDepartmentId: stranger.id,
     });
     const late = occ({
       templateId: template.id,

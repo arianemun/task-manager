@@ -114,17 +114,18 @@ describe("کار گروهی — اثر روی درصد", () => {
           periodStart: day,
           periodEnd: day,
           dueAt: new Date("2026-10-01T14:30:00.000Z"),
+          sourceDepartmentId: dept.id,
           status,
         })
         .returning({ id: schema.taskOccurrences.id })
         .get();
     }
 
-    return { db, schema, a, b, template, occA: occ(a.id), occB: occ(b.id), day };
+    return { db, schema, a, b, template, dept, occA: occ(a.id), occB: occ(b.id), day };
   }
 
   it("SHARED: DONE یک نفر بقیه را DONE_BY_PEER می‌کند و درصدشان را بالا نمی‌برد", async () => {
-    const { db, schema, a, b, template, occA, occB } = await seedPair("SHARED");
+    const { db, schema, a, b, template, dept, occA, occB } = await seedPair("SHARED");
     const { recordGroupOutcome } = await import("./group-completion");
     const { ratesFromStatusList } = await import("@/lib/reports");
 
@@ -135,6 +136,7 @@ describe("کار گروهی — اثر روی درصد", () => {
         periodKey: "D:other",
         periodStart: "2026-10-01",
         periodEnd: "2026-10-01",
+        sourceDepartmentId: dept.id,
         status: "NOT_DONE",
       })
       .run();

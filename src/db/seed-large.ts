@@ -62,6 +62,7 @@ async function main() {
   }
 
   const staffIds: number[] = [];
+  const staffDepartment = new Map<number, number>();
   for (let i = 1; i <= 50; i++) {
     const username = `bench_staff_${i}`;
     let u = db.select().from(users).where(eq(users.username, username)).get();
@@ -84,6 +85,7 @@ async function main() {
         .get();
     }
     staffIds.push(u.id);
+    staffDepartment.set(u.id, u.departmentId ?? deptIds[i % deptIds.length]!);
   }
 
   let cats = db.select().from(taskCategories).all();
@@ -160,6 +162,7 @@ async function main() {
     periodKey: string;
     periodStart: GDate;
     periodEnd: GDate;
+    sourceDepartmentId: number;
     status: (typeof statuses)[number];
     completedAt: Date | null;
     reasonCode: string | null;
@@ -179,6 +182,7 @@ async function main() {
           periodKey: `D:${day}`,
           periodStart: day,
           periodEnd: day,
+          sourceDepartmentId: staffDepartment.get(userId)!,
           status: st,
           completedAt:
             st === "DONE" || st === "DONE_LATE" || st === "NOT_DONE"

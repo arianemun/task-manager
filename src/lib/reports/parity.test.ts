@@ -72,6 +72,12 @@ describe("parity me ↔ admin rates", () => {
       .returning({ id: schema.users.id })
       .get();
 
+    const dept = db
+      .insert(schema.departments)
+      .values({ name: `parity_${Date.now()}` })
+      .returning({ id: schema.departments.id })
+      .get();
+
     const staff = db
       .insert(schema.users)
       .values({
@@ -82,6 +88,8 @@ describe("parity me ↔ admin rates", () => {
         fullNameNormalized: "پ",
         mustChangePassword: false,
         isActive: true,
+        departmentId: dept.id,
+        departmentJoinedAt: fromJalali(1404, 3, 1),
       })
       .returning({ id: schema.users.id })
       .get();
@@ -122,6 +130,7 @@ describe("parity me ↔ admin rates", () => {
           periodKey: `D:parity-${i++}`,
           periodStart: r.end,
           periodEnd: r.end,
+          sourceDepartmentId: dept.id,
           status: r.status,
         })
         .run();

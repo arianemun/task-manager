@@ -265,7 +265,7 @@ type InsertRow = {
   periodEnd: string;
   dueAt: Date;
   status: "PENDING" | "EXCUSED";
-  sourceDepartmentId: number | null;
+  sourceDepartmentId: number;
 };
 
 function buildInsertsForUser(
@@ -296,6 +296,7 @@ function buildInsertsForUser(
       joinedAt: path.joinedAt,
     })),
   });
+  if (sourceDepartmentId == null) return [];
 
   const periods = getOccurrencesInRange(
     templateInput(template),

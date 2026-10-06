@@ -336,13 +336,10 @@ export const taskOccurrences = sqliteTable(
       (): AnySQLiteColumn => taskOccurrences.id,
       { onDelete: "set null" },
     ),
-    /**
-     * دپارتمانی که این ردیف از طرف آن ساخته شده.
-     * تا پایان backfill تهی می‌ماند؛ بعد از پر شدن NOT NULL می‌شود.
-     */
-    sourceDepartmentId: integer("source_department_id").references(
-      () => departments.id,
-    ),
+    /** دپارتمانی که این ردیف از طرف آن ساخته شده. */
+    sourceDepartmentId: integer("source_department_id")
+      .notNull()
+      .references(() => departments.id),
     /** زمان آخرین ویرایش پاسخ پس از ثبت اول */
     editedAt: integer("edited_at", { mode: "timestamp_ms" }),
     reviewedBy: integer("reviewed_by").references(() => users.id, {
