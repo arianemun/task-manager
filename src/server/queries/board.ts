@@ -8,6 +8,7 @@ import {
 } from "@/db/schema";
 import type { AuthUser } from "@/lib/auth/user";
 import { userInDepartmentsSql } from "@/lib/departments/membership";
+import { occurrenceSourceScope } from "@/lib/scope/occurrences";
 import {
   endOfJalaliMonth,
   endOfJalaliWeek,
@@ -167,9 +168,7 @@ export function loadBoardDay(
         sql`${taskOccurrences.periodStart} <= ${date}`,
         sql`${taskOccurrences.periodEnd} >= ${date}`,
         sql`(${taskOccurrences.periodKey} like 'D:%' OR ${taskOccurrences.periodKey} like 'O:%')`,
-        departmentId
-          ? eq(taskOccurrences.sourceDepartmentId, departmentId)
-          : undefined,
+        occurrenceSourceScope(actor, departmentId ?? null),
       ),
     )
     .all();
@@ -254,9 +253,7 @@ export function loadBoardPeriod(
         sql`${taskOccurrences.periodKey} like ${prefix + "%"}`,
         sql`${taskOccurrences.periodStart} <= ${end}`,
         sql`${taskOccurrences.periodEnd} >= ${start}`,
-        departmentId
-          ? eq(taskOccurrences.sourceDepartmentId, departmentId)
-          : undefined,
+        occurrenceSourceScope(actor, departmentId ?? null),
       ),
     )
     .all();

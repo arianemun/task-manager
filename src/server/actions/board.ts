@@ -9,6 +9,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { isAuthError } from "@/lib/auth/errors";
 import { requirePermission } from "@/lib/auth/user";
 import { compareGDate } from "@/lib/dates";
+import { assertOccurrenceSourceInScope } from "@/lib/scope/occurrences";
 import { assertUserInScope } from "@/lib/scope/users";
 import {
   excuseOccurrencesInRange,
@@ -57,6 +58,7 @@ export async function updateOccurrenceStatusAction(
     if (!occ) return { ok: false, error: "یافت نشد" };
 
     assertUserInScope(actor, occ.userId);
+    assertOccurrenceSourceInScope(actor, occ.sourceDepartmentId);
 
     const prev = occ.status;
     const closing =
@@ -167,11 +169,14 @@ export async function createStaffLeaveAction(
       })
       .run();
 
-    const excused = excuseOccurrencesInRange({
+    const sourceDepartmentIds =
+      actor.role === "MANAGER" ? actor.departmentIds : undefined;
+    const excusedBefore = excuseOccurrencesInRange({
       userId,
       startDate,
       endDate,
       reason,
+      sourceDepartmentIds,
     });
 
     generateOccurrences({
@@ -180,7 +185,14 @@ export async function createStaffLeaveAction(
       to: endDate,
       skipCursorUpdate: true,
     });
-    excuseOccurrencesInRange({ userId, startDate, endDate, reason });
+    const excusedAfter = excuseOccurrencesInRange({
+      userId,
+      startDate,
+      endDate,
+      reason,
+      sourceDepartmentIds,
+    });
+    const excused = excusedBefore + excusedAfter;
 
     writeAuditLog({
       actorId: actor.id,

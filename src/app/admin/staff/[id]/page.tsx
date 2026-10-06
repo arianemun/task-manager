@@ -156,11 +156,16 @@ export default async function StaffDetailPage({ params, searchParams }: Props) {
       ? tabRaw
       : "info";
 
+  const membershipIds = memberships.map((item) => item.id);
+  const taskDepartmentIds =
+    actor.role === "MANAGER"
+      ? membershipIds.filter((id) => actor.departmentIds.includes(id))
+      : membershipIds;
   const assignedTasks =
     activeTab === "tasks"
       ? listTasksForActor(actor, {
           status: "active",
-          departmentIds: memberships.map((item) => item.id),
+          departmentIds: taskDepartmentIds,
         })
       : [];
 

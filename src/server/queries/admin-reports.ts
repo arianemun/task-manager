@@ -9,6 +9,7 @@ import {
 import type { AuthUser } from "@/lib/auth/user";
 import { reasonLabelMap } from "@/lib/settings/not-done-reasons";
 import { departmentNamesForUser } from "@/lib/departments/membership";
+import { occurrenceSourceScope } from "@/lib/scope/occurrences";
 import { rateStatusSql } from "@/lib/reports/rate-sql";
 import { openPeriodCounts } from "@/server/queries/report-core";
 import {
@@ -93,16 +94,8 @@ function baseOccurrenceWhere(
   if (filters.priority) {
     clauses.push(eq(taskTemplates.priority, filters.priority));
   }
-  if (filters.departmentId) {
-    const allowed =
-      actor.role !== "MANAGER" ||
-      actor.departmentIds.includes(filters.departmentId);
-    if (allowed) {
-      clauses.push(
-        eq(taskOccurrences.sourceDepartmentId, filters.departmentId),
-      );
-    }
-  }
+  const sourceScope = occurrenceSourceScope(actor, filters.departmentId);
+  if (sourceScope) clauses.push(sourceScope);
   return { clauses, userIds };
 }
 

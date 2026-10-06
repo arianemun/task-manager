@@ -615,7 +615,11 @@ export function excuseOccurrencesInRange(input: {
   startDate: GDate;
   endDate: GDate;
   reason: string;
+  sourceDepartmentIds?: number[];
 }): number {
+  if (input.sourceDepartmentIds && input.sourceDepartmentIds.length === 0) {
+    return 0;
+  }
   const result = db
     .update(taskOccurrences)
     .set({
@@ -629,6 +633,9 @@ export function excuseOccurrencesInRange(input: {
         eq(taskOccurrences.status, "PENDING"),
         sql`${taskOccurrences.periodStart} <= ${input.endDate}`,
         sql`${taskOccurrences.periodEnd} >= ${input.startDate}`,
+        input.sourceDepartmentIds
+          ? inArray(taskOccurrences.sourceDepartmentId, input.sourceDepartmentIds)
+          : undefined,
       ),
     )
     .run();
