@@ -288,4 +288,130 @@ describe("کار گروهی — اثر روی درصد", () => {
       .filter((row) => row.id === occA.id || row.id === occB.id);
     expect(rows.map((row) => row.status).sort()).toEqual(["MISSED", "MISSED"]);
   });
+
+  it("SHARED روی دو دپارتمان فقط همکاران همان منبع را می‌بندد", async () => {
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const bcrypt = await import("bcryptjs");
+    const hash = await bcrypt.hash("x", 4);
+    const day = "2026-10-06";
+
+    const admin = db
+      .insert(schema.users)
+      .values({
+        username: `ga_${Math.random()}`,
+        passwordHash: hash,
+        role: "ADMIN",
+        fullName: "ا",
+        fullNameNormalized: "ا",
+        mustChangePassword: false,
+        isActive: true,
+      })
+      .returning()
+      .get();
+    const deptA = db
+      .insert(schema.departments)
+      .values({ name: "گروه-الف", managerId: admin.id })
+      .returning()
+      .get();
+    const deptB = db
+      .insert(schema.departments)
+      .values({ name: "گروه-ب", managerId: admin.id })
+      .returning()
+      .get();
+    const person = (name: string, departmentId: number) =>
+      db
+        .insert(schema.users)
+        .values({
+          username: `${name}_${Math.random()}`,
+          passwordHash: hash,
+          role: "STAFF",
+          fullName: name,
+          fullNameNormalized: name,
+          departmentId,
+          departmentJoinedAt: day,
+          mustChangePassword: false,
+          isActive: true,
+        })
+        .returning()
+        .get();
+    const a1 = person("الف۱", deptA.id);
+    const a2 = person("الف۲", deptA.id);
+    const b1 = person("ب۱", deptB.id);
+    const shared = person("مشترک", deptA.id);
+    db.insert(schema.userDepartments)
+      .values([
+        { userId: a1.id, departmentId: deptA.id, joinedAt: day },
+        { userId: a2.id, departmentId: deptA.id, joinedAt: day },
+        { userId: b1.id, departmentId: deptB.id, joinedAt: day },
+        { userId: shared.id, departmentId: deptA.id, joinedAt: day },
+        { userId: shared.id, departmentId: deptB.id, joinedAt: "2026-06-01" },
+      ])
+      .run();
+    const template = db
+      .insert(schema.taskTemplates)
+      .values({
+        title: "مشترک دو دپارتمان",
+        recurrenceType: "DAILY",
+        recurrenceConfig: {},
+        startDate: day,
+        completionMode: "SHARED",
+        isActive: true,
+        createdBy: admin.id,
+      })
+      .returning()
+      .get();
+    for (const departmentId of [deptA.id, deptB.id]) {
+      db.insert(schema.taskAssignments)
+        .values({
+          templateId: template.id,
+          assigneeType: "DEPARTMENT",
+          departmentId,
+        })
+        .run();
+    }
+    const occ = (userId: number, sourceDepartmentId: number) =>
+      db
+        .insert(schema.taskOccurrences)
+        .values({
+          templateId: template.id,
+          userId,
+          periodKey: `D:${day}`,
+          periodStart: day,
+          periodEnd: day,
+          status: "PENDING",
+          sourceDepartmentId,
+        })
+        .returning()
+        .get();
+    const a1Occ = occ(a1.id, deptA.id);
+    const a2Occ = occ(a2.id, deptA.id);
+    const b1Occ = occ(b1.id, deptB.id);
+    const sharedOcc = occ(shared.id, deptA.id);
+
+    const { recordGroupOutcome } = await import("./group-completion");
+    recordGroupOutcome({
+      templateId: template.id,
+      periodKey: `D:${day}`,
+      completerUserId: a1.id,
+      sourceOccurrenceId: a1Occ.id,
+      status: "DONE",
+      completedAt: new Date(`${day}T12:00:00+03:30`),
+      note: null,
+      reasonCode: null,
+      attachmentPath: null,
+      editedAt: null,
+    });
+
+    const statusOf = (id: number) =>
+      db
+        .select()
+        .from(schema.taskOccurrences)
+        .where(eq(schema.taskOccurrences.id, id))
+        .get()!.status;
+    expect(statusOf(a1Occ.id)).toBe("DONE");
+    expect(statusOf(a2Occ.id)).toBe("DONE_BY_PEER");
+    expect(statusOf(sharedOcc.id)).toBe("DONE_BY_PEER");
+    expect(statusOf(b1Occ.id)).toBe("PENDING");
+  });
 });

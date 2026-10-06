@@ -108,6 +108,12 @@ export function recordGroupOutcome(input: {
   let blockedName: string | null = null;
 
   db.transaction((tx) => {
+    const source = tx
+      .select({ sourceDepartmentId: taskOccurrences.sourceDepartmentId })
+      .from(taskOccurrences)
+      .where(eq(taskOccurrences.id, input.sourceOccurrenceId))
+      .get();
+
     const siblings = tx
       .select()
       .from(taskOccurrences)
@@ -116,6 +122,12 @@ export function recordGroupOutcome(input: {
           eq(taskOccurrences.templateId, input.templateId),
           eq(taskOccurrences.periodKey, input.periodKey),
           inArray(taskOccurrences.userId, members),
+          source
+            ? eq(
+                taskOccurrences.sourceDepartmentId,
+                source.sourceDepartmentId,
+              )
+            : undefined,
         ),
       )
       .all();

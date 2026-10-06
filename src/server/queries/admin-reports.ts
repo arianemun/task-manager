@@ -646,6 +646,7 @@ export function sharedGroupSummary(actor: AuthUser, filters: ReportFilters) {
     .select({
       templateId: taskOccurrences.templateId,
       periodKey: taskOccurrences.periodKey,
+      sourceDepartmentId: taskOccurrences.sourceDepartmentId,
       status: taskOccurrences.status,
     })
     .from(taskOccurrences)
@@ -655,7 +656,7 @@ export function sharedGroupSummary(actor: AuthUser, filters: ReportFilters) {
 
   const doneByPeriod = new Map<string, boolean>();
   for (const row of rows) {
-    const key = `${row.templateId}:${row.periodKey}`;
+    const key = `${row.templateId}:${row.periodKey}:${row.sourceDepartmentId}`;
     const done = row.status === "DONE" || row.status === "DONE_LATE";
     doneByPeriod.set(key, (doneByPeriod.get(key) ?? false) || done);
   }
