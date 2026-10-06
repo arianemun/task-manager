@@ -31,6 +31,7 @@ import {
   LAST_OCCURRENCE_GENERATED_KEY,
   LAST_PERIOD_CLOSE_KEY,
 } from "@/lib/settings/system-keys";
+import { resolveOccurrenceSource } from "@/lib/tasks/occurrence-source";
 import { syncPendingGroupClosures } from "@/server/services/group-completion";
 
 const LAST_GEN_KEY = LAST_OCCURRENCE_GENERATED_KEY;
@@ -143,6 +144,7 @@ export function resolveCatchupRange(today: GDate): { from: GDate; to: GDate } {
 }
 
 type DeptPath = {
+  departmentId: number;
   assignDate: GDate;
   joinedAt: GDate | null;
 };
@@ -150,6 +152,7 @@ type DeptPath = {
 type Assignee = {
   userId: number;
   hireDate: GDate | null;
+  primaryDepartmentId: number | null;
   userAssignDate: GDate | null;
   deptPaths: DeptPath[];
 };
@@ -169,6 +172,7 @@ function resolveAssignees(templateId: number): Assignee[] {
       a = {
         userId,
         hireDate: u.hireDate,
+        primaryDepartmentId: u.departmentId,
         userAssignDate: null,
         deptPaths: [],
       };
@@ -198,6 +202,7 @@ function resolveAssignees(templateId: number): Assignee[] {
       for (const member of members) {
         const entry = ensure(member.user.id, member.user);
         entry.deptPaths.push({
+          departmentId: a.departmentId,
           assignDate: assignmentCreatedDate,
           joinedAt: member.joinedAt,
         });
@@ -260,6 +265,7 @@ type InsertRow = {
   periodEnd: string;
   dueAt: Date;
   status: "PENDING" | "EXCUSED";
+  sourceDepartmentId: number | null;
 };
 
 function buildInsertsForUser(
@@ -273,6 +279,23 @@ function buildInsertsForUser(
   const effective = assigneeEffectiveStart(template.startDate, assignee);
   const from = maxGDate(effective, rangeFrom);
   if (compareGDate(from, rangeTo) > 0) return [];
+
+  const sourceDepartmentId = resolveOccurrenceSource({
+    paths: [
+      ...(assignee.userAssignDate
+        ? [{ kind: "direct" as const }]
+        : []),
+      ...assignee.deptPaths.map((path) => ({
+        kind: "department" as const,
+        departmentId: path.departmentId,
+      })),
+    ],
+    primaryDepartmentId: assignee.primaryDepartmentId,
+    memberships: assignee.deptPaths.map((path) => ({
+      departmentId: path.departmentId,
+      joinedAt: path.joinedAt,
+    })),
+  });
 
   const periods = getOccurrencesInRange(
     templateInput(template),
@@ -291,6 +314,7 @@ function buildInsertsForUser(
     status: isOnLeave(leaves, p.periodStart, p.periodEnd)
       ? ("EXCUSED" as const)
       : ("PENDING" as const),
+    sourceDepartmentId,
   }));
 }
 

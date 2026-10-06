@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
 import fs from "node:fs";
 import path from "node:path";
 import { db, type Db } from "@/db";
@@ -41,7 +41,8 @@ export type HealthCheckId =
   | "after_deactivation"
   | "generate_stale"
   | "backup_stale"
-  | "close_stale";
+  | "close_stale"
+  | "source_department";
 
 export type HealthFinding = {
   id: HealthCheckId;
@@ -67,7 +68,7 @@ type CheckRunner = {
 
 function counted(
   database: Db,
-  where: ReturnType<typeof and>,
+  where: SQL | undefined,
 ): { count: number; sampleIds: number[] } {
   const countRow = database
     .select({ n: sql<number>`count(*)` })
@@ -525,6 +526,44 @@ function backupStale(backupDir?: string) {
   return { count: 0, sampleIds: [] as number[] };
 }
 
+/**
+ * بررسی ۱۲ — منبع دپارتمان.
+ * عضویت فعلی است: ردیف user_departments با joined_at <= period_start،
+ * یا در نبود هر ردیف عضویت، ستون قدیمی users.department_id.
+ * نبودن ردیف عضویت بعد از خروج از دپارتمان هم «عضو نبودن» حساب می‌شود.
+ */
+function sourceDepartment(database: Db) {
+  return counted(
+    database,
+    sql`(
+      ${taskOccurrences.sourceDepartmentId} IS NULL
+      OR NOT (
+        EXISTS (
+          SELECT 1 FROM user_departments AS ud
+          WHERE ud.user_id = ${taskOccurrences.userId}
+            AND ud.department_id = ${taskOccurrences.sourceDepartmentId}
+            AND ud.joined_at <= ${taskOccurrences.periodStart}
+        )
+        OR (
+          NOT EXISTS (
+            SELECT 1 FROM user_departments AS ud
+            WHERE ud.user_id = ${taskOccurrences.userId}
+          )
+          AND EXISTS (
+            SELECT 1 FROM users AS u
+            WHERE u.id = ${taskOccurrences.userId}
+              AND u.department_id = ${taskOccurrences.sourceDepartmentId}
+              AND (
+                u.department_joined_at IS NULL
+                OR u.department_joined_at <= ${taskOccurrences.periodStart}
+              )
+          )
+        )
+      )
+    )`,
+  );
+}
+
 /** بررسی ۱۱ — settings PK. */
 function closeStale(database: Db) {
   return dateSettingStale(
@@ -584,6 +623,12 @@ const RUNNERS: CheckRunner[] = [
     id: "close_stale",
     title: "آخرین close-periods موفق قدیمی‌تر از ۲ روز",
     run: closeStale,
+  },
+  {
+    id: "source_department",
+    title:
+      "occurrence بدون source_department_id یا با دپارتمانی که کاربر در period_start عضوش نبوده",
+    run: sourceDepartment,
   },
 ];
 

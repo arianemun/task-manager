@@ -535,4 +535,137 @@ describe("تولید occurrence — DB", () => {
         .all().length,
     ).toBeGreaterThanOrEqual(1);
   });
+
+  it("منبع occurrence: دپارتمان، مستقیم، و اولویت بین چند مسیر", async () => {
+    const dates = await loadDates();
+    dates.setNowProvider(() => new Date("2026-10-06T10:00:00+03:30"));
+    const today = dates.todayTehran();
+    const assignMs = fromZonedTime(`${today}T08:00:00`, "Asia/Tehran").getTime();
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const bcrypt = await import("bcryptjs");
+    const hash = await bcrypt.hash("x", 4);
+
+    const admin = db
+      .insert(schema.users)
+      .values({
+        username: `src_${Date.now()}`,
+        passwordHash: hash,
+        role: "ADMIN",
+        fullName: "ا",
+        fullNameNormalized: "ا",
+        mustChangePassword: false,
+        isActive: true,
+      })
+      .returning({ id: schema.users.id })
+      .get();
+    const dept = (name: string) =>
+      db
+        .insert(schema.departments)
+        .values({ name, managerId: admin.id })
+        .returning({ id: schema.departments.id })
+        .get();
+    const deptA = dept("منبع-الف");
+    const deptB = dept("منبع-ب");
+    const deptC = dept("منبع-ج");
+
+    const staff = db
+      .insert(schema.users)
+      .values({
+        username: `src_s_${Date.now()}`,
+        passwordHash: hash,
+        role: "STAFF",
+        fullName: "پ",
+        fullNameNormalized: "پ",
+        mustChangePassword: false,
+        isActive: true,
+        departmentId: deptB.id,
+        departmentJoinedAt: "2026-06-01",
+        hireDate: "2026-01-01",
+      })
+      .returning({ id: schema.users.id })
+      .get();
+    db.insert(schema.userDepartments)
+      .values([
+        { userId: staff.id, departmentId: deptA.id, joinedAt: "2026-01-01" },
+        { userId: staff.id, departmentId: deptB.id, joinedAt: "2026-06-01" },
+      ])
+      .run();
+
+    const templateFor = (title: string, departmentIds: number[], direct: boolean) => {
+      const template = db
+        .insert(schema.taskTemplates)
+        .values({
+          title,
+          recurrenceType: "DAILY",
+          recurrenceConfig: { interval: 1 },
+          startDate: "2026-10-01",
+          skipHolidays: false,
+          isActive: true,
+          createdBy: admin.id,
+        })
+        .returning({ id: schema.taskTemplates.id })
+        .get();
+      if (direct) {
+        db.insert(schema.taskAssignments)
+          .values({
+            templateId: template.id,
+            assigneeType: "USER",
+            userId: staff.id,
+            createdAt: new Date(assignMs),
+          })
+          .run();
+      }
+      for (const departmentId of departmentIds) {
+        db.insert(schema.taskAssignments)
+          .values({
+            templateId: template.id,
+            assigneeType: "DEPARTMENT",
+            departmentId,
+            createdAt: new Date(assignMs),
+          })
+          .run();
+      }
+      return template.id;
+    };
+
+    const onlyDept = templateFor("فقط دپارتمان", [deptA.id], false);
+    const onlyDirect = templateFor("فقط مستقیم", [], true);
+    const primaryWins = templateFor("اصلی مقدم است", [deptA.id, deptB.id], true);
+
+    const { generateOccurrences } = await import("./occurrence-generate");
+    generateOccurrences({
+      userId: staff.id,
+      from: today,
+      to: today,
+      skipCursorUpdate: true,
+    });
+
+    db.update(schema.users)
+      .set({ departmentId: deptC.id })
+      .where(eq(schema.users.id, staff.id))
+      .run();
+    const oldestWins = templateFor("قدیمی‌ترین عضویت", [deptA.id, deptB.id], true);
+    generateOccurrences({
+      userId: staff.id,
+      from: today,
+      to: today,
+      skipCursorUpdate: true,
+    });
+
+    const sourceOf = (templateId: number) => {
+      const rows = db
+        .select()
+        .from(schema.taskOccurrences)
+        .where(eq(schema.taskOccurrences.templateId, templateId))
+        .all();
+      expect(rows).toHaveLength(1);
+      return rows[0]?.sourceDepartmentId;
+    };
+
+    expect(sourceOf(onlyDept)).toBe(deptA.id);
+    expect(sourceOf(onlyDirect)).toBe(deptB.id);
+    expect(sourceOf(primaryWins)).toBe(deptB.id);
+    expect(sourceOf(oldestWins)).toBe(deptA.id);
+  });
 });

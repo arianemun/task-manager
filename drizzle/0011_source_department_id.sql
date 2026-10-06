@@ -1,0 +1,2 @@
+ALTER TABLE `task_occurrences` ADD `source_department_id` integer REFERENCES departments(id);--> statement-breakpoint
+CREATE INDEX `task_occurrences_source_department_idx` ON `task_occurrences` (`source_department_id`);

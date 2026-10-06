@@ -156,6 +156,7 @@ describe("بررسی سلامت داده", () => {
     completedByUserId?: number | null;
     doneByOccurrenceId?: number | null;
     createdAt?: Date;
+    sourceDepartmentId?: number | null;
   }) {
     const period = input.period ?? "2026-10-01";
     return db
@@ -174,6 +175,7 @@ describe("بررسی سلامت داده", () => {
         completedByUserId: input.completedByUserId,
         doneByOccurrenceId: input.doneByOccurrenceId,
         createdAt: input.createdAt,
+        sourceDepartmentId: input.sourceDepartmentId,
       })
       .returning({ id: schema.taskOccurrences.id })
       .get();
@@ -510,5 +512,42 @@ describe("بررسی سلامت داده", () => {
     expect(
       healthRunIsStale(old, Date.parse("2026-10-06T10:00:00.000Z")),
     ).toBe(true);
+  });
+
+  it("منبع تهی یا دپارتمانی که در period_start عضو آن نبوده را پیدا می‌کند", () => {
+    const { admin, dept, staff } = seedPeople();
+    const later = db
+      .insert(schema.departments)
+      .values({ name: "دیر" })
+      .returning({ id: schema.departments.id })
+      .get();
+    db.insert(schema.userDepartments)
+      .values([
+        { userId: staff.id, departmentId: dept.id, joinedAt: "2026-06-01" },
+        { userId: staff.id, departmentId: later.id, joinedAt: "2026-10-05" },
+      ])
+      .run();
+    const template = seedTemplate(admin.id);
+    const missing = occ({
+      templateId: template.id,
+      userId: staff.id,
+      period: "2026-09-01",
+    });
+    const late = occ({
+      templateId: template.id,
+      userId: staff.id,
+      period: "2026-10-01",
+      sourceDepartmentId: later.id,
+    });
+    occ({
+      templateId: template.id,
+      userId: staff.id,
+      period: "2026-10-06",
+      sourceDepartmentId: dept.id,
+    });
+
+    const found = finding("source_department");
+    expect(found.count).toBe(2);
+    expect(found.sampleIds).toEqual([missing.id, late.id]);
   });
 });

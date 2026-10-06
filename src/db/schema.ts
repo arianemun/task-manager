@@ -336,6 +336,13 @@ export const taskOccurrences = sqliteTable(
       (): AnySQLiteColumn => taskOccurrences.id,
       { onDelete: "set null" },
     ),
+    /**
+     * دپارتمانی که این ردیف از طرف آن ساخته شده.
+     * تا پایان backfill تهی می‌ماند؛ بعد از پر شدن NOT NULL می‌شود.
+     */
+    sourceDepartmentId: integer("source_department_id").references(
+      () => departments.id,
+    ),
     /** زمان آخرین ویرایش پاسخ پس از ثبت اول */
     editedAt: integer("edited_at", { mode: "timestamp_ms" }),
     reviewedBy: integer("reviewed_by").references(() => users.id, {
@@ -364,6 +371,7 @@ export const taskOccurrences = sqliteTable(
     index("task_occurrences_user_period_end_idx").on(t.userId, t.periodEnd),
     index("task_occurrences_completed_by_idx").on(t.completedByUserId),
     index("task_occurrences_done_by_occ_idx").on(t.doneByOccurrenceId),
+    index("task_occurrences_source_department_idx").on(t.sourceDepartmentId),
   ],
 );
 
