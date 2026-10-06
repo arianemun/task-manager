@@ -9,8 +9,6 @@ import { compareGDate, type GDate } from "@/lib/dates";
  *   و در دیتابیس PENDING می‌ماند تا پرسنل هنوز بتواند ثبت کند.
  * - PENDING که مهلتش نرسیده «در جریان» است: از صورت و مخرج حذف، جدا شمرده می‌شود.
  * - EXCUSED و DONE_BY_PEER از صورت و مخرج حذف (نه امتیاز، نه جریمه).
- * - ردیف DONE/DONE_LATE/NOT_DONE که completed_by شخص دیگری است مثل DONE_BY_PEER
- *   حذف می‌شود (ردیف‌های قدیمیِ کپی‌شده، قبل از اصلاح داده).
  * - مخرج صفر → null، نه ۰ ساختگی و نه ۱۰۰.
  * - اگر بازه امروز را شامل شود، دوره جاری هفتگی/ماهانه با period_end بعد از بازه
  *   در «در جریان» می‌آید و فقط وقتی مهلتش گذشته در درصد (OVERDUE) حساب می‌شود.
@@ -62,14 +60,6 @@ export function isOpenCurrentPeriod(row: ClassifiedOccurrence, ctx: RateContext)
   );
 }
 
-function recordedByOther(row: ClassifiedOccurrence): boolean {
-  return (
-    row.completedByUserId != null &&
-    row.userId != null &&
-    row.completedByUserId !== row.userId
-  );
-}
-
 function deadlinePassed(row: ClassifiedOccurrence, nowMs: number): boolean {
   return row.dueAtMs != null && row.dueAtMs <= nowMs;
 }
@@ -83,13 +73,6 @@ export function classifyOccurrence(
   if (!inside && !open) return { kind: "out_of_range" };
 
   if (row.status === "EXCUSED" || row.status === "DONE_BY_PEER") {
-    return inside ? { kind: "excluded" } : { kind: "out_of_range" };
-  }
-
-  if (
-    recordedByOther(row) &&
-    (row.status === "DONE" || row.status === "DONE_LATE" || row.status === "NOT_DONE")
-  ) {
     return inside ? { kind: "excluded" } : { kind: "out_of_range" };
   }
 

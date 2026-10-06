@@ -1,37 +1,19 @@
 /**
- * فقط گزارش. هیچ ردیفی را عوض نمی‌کند.
- * occurrenceهایی که وضعیت بسته‌شان روی شخص دیگری ثبت شده
- * (کپی قدیمی کار گروهی) را فهرست می‌کند.
+ * سلامت داده: اگر occurrence بسته‌ای completed_by شخص دیگری داشته باشد
+ * (به‌جای وضعیت DONE_BY_PEER) با کد خروج ۱ خطا می‌دهد.
  */
-import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { db } from "../src/db";
-import { taskOccurrences, taskTemplates, users } from "../src/db/schema";
+import { users } from "../src/db/schema";
+import { listCopiedForeignCloses } from "../src/lib/tasks/copied-group-done";
 
-const rows = db
-  .select({
-    id: taskOccurrences.id,
-    status: taskOccurrences.status,
-    periodKey: taskOccurrences.periodKey,
-    userId: taskOccurrences.userId,
-    staff: users.fullName,
-    completedByUserId: taskOccurrences.completedByUserId,
-    templateId: taskOccurrences.templateId,
-    title: taskTemplates.title,
-  })
-  .from(taskOccurrences)
-  .innerJoin(users, eq(taskOccurrences.userId, users.id))
-  .innerJoin(taskTemplates, eq(taskOccurrences.templateId, taskTemplates.id))
-  .where(
-    and(
-      isNotNull(taskOccurrences.completedByUserId),
-      sql`${taskOccurrences.completedByUserId} != ${taskOccurrences.userId}`,
-      inArray(taskOccurrences.status, ["DONE", "DONE_LATE", "NOT_DONE"]),
-    ),
-  )
-  .all();
-
+const rows = listCopiedForeignCloses();
 const completerIds = [
-  ...new Set(rows.map((row) => row.completedByUserId).filter((id): id is number => id != null)),
+  ...new Set(
+    rows
+      .map((row) => row.completedByUserId)
+      .filter((id): id is number => id != null),
+  ),
 ];
 const names = new Map<number, string>();
 if (completerIds.length > 0) {
@@ -57,4 +39,9 @@ for (const row of rows) {
       `completedBy=${row.completedByUserId}:${names.get(row.completedByUserId ?? 0) ?? "?"}`,
     ].join(" | "),
   );
+}
+
+if (rows.length > 0) {
+  console.error("copied foreign close rows found");
+  process.exit(1);
 }

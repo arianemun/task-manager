@@ -81,7 +81,9 @@ function FaTooltip({
       content={
         <ChartTooltipContent
           className="border-border bg-popover text-popover-foreground text-start shadow-md"
-          formatter={(value, name) => (
+          formatter={(value, name) => {
+            const missing = value == null || value === "";
+            return (
             <div
               className="flex w-full items-center justify-between gap-4 text-start"
               dir="rtl"
@@ -90,12 +92,15 @@ function FaTooltip({
                 {config[String(name)]?.label ?? name}
               </span>
               <span className="font-medium tabular-nums">
-                {valueKind === "percent"
-                  ? faPercent(Number(value))
-                  : faNum(Number(value))}
+                {missing
+                  ? "کار ارزیابی‌شده‌ای نیست"
+                  : valueKind === "percent"
+                    ? faPercent(Number(value))
+                    : faNum(Number(value))}
               </span>
             </div>
-          )}
+            );
+          }}
           labelFormatter={(l) => (
             <span dir="rtl" className="font-medium">
               {toFaDigits(String(l))}
@@ -155,8 +160,8 @@ export function TrendAreaChart({ data, average, loading }: TrendProps) {
       {(() => {
         const rows = data.map((d) => ({
           ...d,
-          rate: d.completionRate ?? 0,
-          avg: average ?? 0,
+          rate: d.completionRate,
+          avg: average,
         }));
         const config = trendChartConfig;
         return (
@@ -192,6 +197,7 @@ export function TrendAreaChart({ data, average, loading }: TrendProps) {
                 stroke="var(--color-rate)"
                 fill="var(--color-rate)"
                 fillOpacity={0.25}
+                connectNulls={false}
                 className="chart-series-primary"
               />
               {average != null ? (
@@ -202,6 +208,7 @@ export function TrendAreaChart({ data, average, loading }: TrendProps) {
                   stroke="var(--color-avg)"
                   strokeDasharray="4 4"
                   dot={false}
+                  connectNulls={false}
                   className="chart-series-avg"
                 />
               ) : null}
@@ -275,7 +282,7 @@ export function HorizontalStaffBar({
   const visible = truncated ? data.slice(0, STAFF_DEFAULT_TOP) : data;
   const rows = visible.map((d) => ({
     name: d.fullName,
-    rate: d.completionRate ?? 0,
+    rate: d.completionRate,
   }));
   const height = staffBarHeightPx(rows.length || 1, isMobile);
   const config = rateChartConfig;
@@ -493,7 +500,7 @@ export function WeekdayBars({
   const empty = data.every((d) => d.completionRate == null);
   const rows = data.map((d) => ({
     name: fa.weekdays[d.weekday as keyof typeof fa.weekdays],
-    rate: d.completionRate ?? 0,
+    rate: d.completionRate,
   }));
   const config = rateChartConfig;
   return (

@@ -34,7 +34,7 @@ export function ReportView({ data }: { data: Report }) {
     const j = toJalali(b.date);
     return {
       label: j.jDate.slice(5),
-      rate: b.rate ?? 0,
+      rate: b.rate,
       hasData: b.rate != null,
     };
   });
@@ -104,7 +104,9 @@ export function ReportView({ data }: { data: Report }) {
                   <ChartTooltipContent
                     formatter={(value) => (
                       <span className="tabular-nums">
-                        {toFaDigits(Number(value))}٪
+                        {value == null || value === ""
+                          ? "کار ارزیابی‌شده‌ای نیست"
+                          : `${toFaDigits(Number(value))}٪`}
                       </span>
                     )}
                     labelFormatter={(l) => (

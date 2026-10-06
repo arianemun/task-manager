@@ -42,6 +42,22 @@ describe("باگ ۲ — PENDING و مخرج صفر", () => {
     expect(rates.completionRate).toBe(0);
   });
 
+  it("DONE با completed_by شخص دیگر همچنان اعتبار خود ردیف است", () => {
+    const klass = classifyOccurrence(
+      {
+        status: "DONE",
+        dueAtMs: null,
+        periodStart: today,
+        periodEnd: today,
+        periodKey: "D:9",
+        userId: 9,
+        completedByUserId: 16,
+      },
+      ctx,
+    );
+    expect(klass).toEqual({ kind: "counted", status: "DONE" });
+  });
+
   it("مخرج صفر null است، نه ۱ و نه ۱۰۰", () => {
     expect(completionRate(0, 0)).toBeNull();
     expect(ratesFromCounts({ PENDING: 4, EXCUSED: 2 }).completionRate).toBeNull();
