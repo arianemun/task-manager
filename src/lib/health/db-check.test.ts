@@ -10,10 +10,10 @@ import type {
   HealthCheckId,
   HealthReport,
 } from "@/lib/health/db-check";
-import { resetNowProvider, setNowProvider } from "@/lib/dates";
 import {
   DATA_HEALTH_LAST_RUN_KEY,
   LAST_OCCURRENCE_GENERATED_KEY,
+  LAST_PERIOD_CLOSE_KEY,
 } from "@/lib/settings/system-keys";
 
 type HealthModule = typeof import("@/lib/health/db-check");
@@ -26,6 +26,8 @@ describe("بررسی سلامت داده", () => {
   let saveHealthReport: HealthModule["saveHealthReport"];
   let loadLastHealthReport: HealthModule["loadLastHealthReport"];
   let healthRunIsStale: HealthModule["healthRunIsStale"];
+  let setNowProvider: typeof import("@/lib/dates").setNowProvider;
+  let resetNowProvider: typeof import("@/lib/dates").resetNowProvider;
   const today = "2026-10-06";
 
   beforeAll(async () => {
@@ -39,6 +41,9 @@ describe("بررسی سلامت داده", () => {
       stdio: "pipe",
     });
     vi.resetModules();
+    const dates = await import("@/lib/dates");
+    setNowProvider = dates.setNowProvider;
+    resetNowProvider = dates.resetNowProvider;
     db = (await import("@/db")).db;
     schema = await import("@/db/schema");
     const health = await import("@/lib/health/db-check");
@@ -416,6 +421,44 @@ describe("بررسی سلامت داده", () => {
       .where(eq(schema.settings.key, LAST_OCCURRENCE_GENERATED_KEY))
       .run();
     expect(finding("generate_stale").count).toBe(0);
+  });
+
+  it("close-periods قدیمی یا غایب را پیدا می‌کند و تاریخ داخل ۲ روز را نه", () => {
+    expect(finding("close_stale").count).toBe(1);
+
+    db.insert(schema.settings)
+      .values({ key: LAST_PERIOD_CLOSE_KEY, value: "2026-10-03" })
+      .run();
+    expect(finding("close_stale").count).toBe(1);
+    expect(finding("close_stale").detail).toContain("2026-10-03");
+
+    db.update(schema.settings)
+      .set({ value: "2026-10-04" })
+      .where(eq(schema.settings.key, LAST_PERIOD_CLOSE_KEY))
+      .run();
+    expect(finding("close_stale").count).toBe(0);
+  });
+
+  it("بکاپ قدیمی را پیدا می‌کند و بکاپ تازه را نه", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tm-bak-"));
+    const oldFile = path.join(dir, "app_old.db");
+    fs.writeFileSync(oldFile, "x");
+    fs.utimesSync(oldFile, new Date("2026-10-03T12:00:00+03:30"), new Date("2026-10-03T12:00:00+03:30"));
+    expect(
+      runHealthChecks(db, { backupDir: dir }).checks.find(
+        (check) => check.id === "backup_stale",
+      )?.count,
+    ).toBe(1);
+
+    const fresh = path.join(dir, "app_fresh.db");
+    fs.writeFileSync(fresh, "x");
+    fs.utimesSync(fresh, new Date("2026-10-06T12:00:00+03:30"), new Date("2026-10-06T12:00:00+03:30"));
+    expect(
+      runHealthChecks(db, { backupDir: dir }).checks.find(
+        (check) => check.id === "backup_stale",
+      )?.count,
+    ).toBe(0);
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 
   it("اجرای بررسی دادهٔ کاری را عوض نمی‌کند و فقط خلاصه را ذخیره می‌کند", () => {

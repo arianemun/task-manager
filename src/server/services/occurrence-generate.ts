@@ -27,7 +27,10 @@ import {
   type RecurrenceConfig,
   type RecurrenceTemplateInput,
 } from "@/lib/recurrence";
-import { LAST_OCCURRENCE_GENERATED_KEY } from "@/lib/settings/system-keys";
+import {
+  LAST_OCCURRENCE_GENERATED_KEY,
+  LAST_PERIOD_CLOSE_KEY,
+} from "@/lib/settings/system-keys";
 import { syncPendingGroupClosures } from "@/server/services/group-completion";
 
 const LAST_GEN_KEY = LAST_OCCURRENCE_GENERATED_KEY;
@@ -106,6 +109,22 @@ function setLastGeneratedDate(date: GDate): void {
       .run();
   } else {
     db.insert(settings).values({ key: LAST_GEN_KEY, value: date }).run();
+  }
+}
+
+function setLastCloseDate(date: GDate): void {
+  const existing = db
+    .select()
+    .from(settings)
+    .where(eq(settings.key, LAST_PERIOD_CLOSE_KEY))
+    .get();
+  if (existing) {
+    db.update(settings)
+      .set({ value: date, updatedAt: new Date() })
+      .where(eq(settings.key, LAST_PERIOD_CLOSE_KEY))
+      .run();
+  } else {
+    db.insert(settings).values({ key: LAST_PERIOD_CLOSE_KEY, value: date }).run();
   }
 }
 
@@ -416,6 +435,7 @@ export function closeMissedPeriods(): CloseResult {
     )
     .run();
 
+  setLastCloseDate(today);
   return { closed: result.changes, asOf: today };
 }
 

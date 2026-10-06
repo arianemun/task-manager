@@ -1,4 +1,6 @@
 import { and, asc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import fs from "node:fs";
+import path from "node:path";
 import { db, type Db } from "@/db";
 import {
   auditLogs,
@@ -20,6 +22,7 @@ import { earliestEligibleStart } from "@/lib/recurrence";
 import {
   DATA_HEALTH_LAST_RUN_KEY,
   LAST_OCCURRENCE_GENERATED_KEY,
+  LAST_PERIOD_CLOSE_KEY,
 } from "@/lib/settings/system-keys";
 import { toFaDigits } from "@/lib/utils";
 
@@ -36,7 +39,9 @@ export type HealthCheckId =
   | "missed_open"
   | "early_period"
   | "after_deactivation"
-  | "generate_stale";
+  | "generate_stale"
+  | "backup_stale"
+  | "close_stale";
 
 export type HealthFinding = {
   id: HealthCheckId;
@@ -439,30 +444,94 @@ function afterDeactivation(database: Db) {
   return { count, sampleIds };
 }
 
-/** بررسی ۹ — settings PK. ردیف occurrence ندارد. */
-function generateStale(database: Db) {
+function dateSettingStale(
+  database: Db,
+  key: string,
+  missingDetail: string,
+) {
   const row = database
     .select({ value: settings.value })
     .from(settings)
-    .where(eq(settings.key, LAST_OCCURRENCE_GENERATED_KEY))
+    .where(eq(settings.key, key))
     .get();
   const today = todayTehran();
   const cutoff = addGregorianDays(today, -2);
   if (!row?.value || !/^\d{4}-\d{2}-\d{2}$/.test(row.value)) {
     return {
       count: 1,
-      sampleIds: [],
-      detail: "last_occurrence_generated_date ثبت نشده",
+      sampleIds: [] as number[],
+      detail: missingDetail,
     };
   }
   if (compareGDate(row.value, cutoff) < 0) {
     return {
       count: 1,
-      sampleIds: [],
-      detail: `آخرین generate: ${row.value}`,
+      sampleIds: [] as number[],
+      detail: `آخرین تاریخ: ${row.value}`,
     };
   }
-  return { count: 0, sampleIds: [] };
+  return { count: 0, sampleIds: [] as number[] };
+}
+
+/** بررسی ۹ — settings PK. ردیف occurrence ندارد. */
+function generateStale(database: Db) {
+  return dateSettingStale(
+    database,
+    LAST_OCCURRENCE_GENERATED_KEY,
+    "last_occurrence_generated_date ثبت نشده",
+  );
+}
+
+function resolveBackupDir(override?: string): string {
+  const raw = override ?? process.env.BACKUP_DIR ?? "./backups";
+  return path.isAbsolute(raw) ? raw : path.join(process.cwd(), raw);
+}
+
+/** بررسی ۱۰ — جدیدترین app_*.db. شناسه occurrence ندارد. */
+function backupStale(backupDir?: string) {
+  const dir = resolveBackupDir(backupDir);
+  const today = todayTehran();
+  const cutoff = addGregorianDays(today, -2);
+  if (!fs.existsSync(dir)) {
+    return {
+      count: 1,
+      sampleIds: [] as number[],
+      detail: `پوشه بکاپ نیست: ${dir}`,
+    };
+  }
+  const names = fs
+    .readdirSync(dir)
+    .filter((name) => name.startsWith("app_") && name.endsWith(".db"));
+  let newest: { name: string; mtimeMs: number } | null = null;
+  for (const name of names) {
+    const mtimeMs = fs.statSync(path.join(dir, name)).mtimeMs;
+    if (!newest || mtimeMs > newest.mtimeMs) newest = { name, mtimeMs };
+  }
+  if (!newest) {
+    return {
+      count: 1,
+      sampleIds: [] as number[],
+      detail: "فایل بکاپ app_*.db پیدا نشد",
+    };
+  }
+  const day = tehranDateFromMs(newest.mtimeMs);
+  if (compareGDate(day, cutoff) < 0) {
+    return {
+      count: 1,
+      sampleIds: [] as number[],
+      detail: `آخرین بکاپ: ${newest.name} (${day})`,
+    };
+  }
+  return { count: 0, sampleIds: [] as number[] };
+}
+
+/** بررسی ۱۱ — settings PK. */
+function closeStale(database: Db) {
+  return dateSettingStale(
+    database,
+    LAST_PERIOD_CLOSE_KEY,
+    "last_period_close_date ثبت نشده",
+  );
 }
 
 const RUNNERS: CheckRunner[] = [
@@ -511,10 +580,18 @@ const RUNNERS: CheckRunner[] = [
     title: "آخرین generate موفق قدیمی‌تر از ۲ روز",
     run: generateStale,
   },
+  {
+    id: "close_stale",
+    title: "آخرین close-periods موفق قدیمی‌تر از ۲ روز",
+    run: closeStale,
+  },
 ];
 
 /** فقط می‌خواند. هیچ ردیف کاری را عوض نمی‌کند. */
-export function runHealthChecks(database: Db = db): HealthReport {
+export function runHealthChecks(
+  database: Db = db,
+  options?: { backupDir?: string },
+): HealthReport {
   const started = performance.now();
   const checks: HealthFinding[] = RUNNERS.map((runner) => {
     const t0 = performance.now();
@@ -527,6 +604,16 @@ export function runHealthChecks(database: Db = db): HealthReport {
       detail: found.detail,
       durationMs: Math.round(performance.now() - t0),
     };
+  });
+  const backupStarted = performance.now();
+  const backup = backupStale(options?.backupDir);
+  checks.push({
+    id: "backup_stale",
+    title: "آخرین فایل بکاپ قدیمی‌تر از ۲ روز",
+    count: backup.count,
+    sampleIds: backup.sampleIds,
+    detail: backup.detail,
+    durationMs: Math.round(performance.now() - backupStarted),
   });
   return {
     ranAt: new Date().toISOString(),
