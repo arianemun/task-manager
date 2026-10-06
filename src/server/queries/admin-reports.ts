@@ -4,15 +4,11 @@ import {
   departments,
   taskOccurrences,
   taskTemplates,
-  userDepartments,
   users,
 } from "@/db/schema";
 import type { AuthUser } from "@/lib/auth/user";
 import { reasonLabelMap } from "@/lib/settings/not-done-reasons";
-import {
-  departmentNamesForUser,
-  userInDepartmentsSql,
-} from "@/lib/departments/membership";
+import { departmentNamesForUser } from "@/lib/departments/membership";
 import { rateStatusSql } from "@/lib/reports/rate-sql";
 import { openPeriodCounts } from "@/server/queries/report-core";
 import {
@@ -52,14 +48,6 @@ function scopedUserIds(actor: AuthUser, filters: ReportFilters): number[] | null
   const scope = scopeUsersQuery(actor);
   if (scope) conditions.push(scope);
 
-  if (filters.departmentId) {
-    const allowed =
-      actor.role !== "MANAGER" ||
-      actor.departmentIds.includes(filters.departmentId);
-    if (allowed) {
-      conditions.push(userInDepartmentsSql([filters.departmentId]));
-    }
-  }
   if (filters.userId) {
     conditions.push(eq(users.id, filters.userId));
   }
@@ -104,6 +92,16 @@ function baseOccurrenceWhere(
   }
   if (filters.priority) {
     clauses.push(eq(taskTemplates.priority, filters.priority));
+  }
+  if (filters.departmentId) {
+    const allowed =
+      actor.role !== "MANAGER" ||
+      actor.departmentIds.includes(filters.departmentId);
+    if (allowed) {
+      clauses.push(
+        eq(taskOccurrences.sourceDepartmentId, filters.departmentId),
+      );
+    }
   }
   return { clauses, userIds };
 }
@@ -261,7 +259,12 @@ export function aggregateByStaff(actor: AuthUser, filters: ReportFilters) {
     return {
       ...u,
       ...rates,
-      bestStreak: bestStreakForUser(u.userId, filters.from, filters.to),
+      bestStreak: bestStreakForUser(
+        u.userId,
+        filters.from,
+        filters.to,
+        filters.departmentId,
+      ),
     };
   });
 
@@ -276,7 +279,12 @@ export function aggregateByStaff(actor: AuthUser, filters: ReportFilters) {
   return list;
 }
 
-function bestStreakForUser(userId: number, from: GDate, to: GDate): number {
+function bestStreakForUser(
+  userId: number,
+  from: GDate,
+  to: GDate,
+  sourceDepartmentId?: number | null,
+): number {
   const rows = db
     .select({
       day: taskOccurrences.periodEnd,
@@ -289,6 +297,9 @@ function bestStreakForUser(userId: number, from: GDate, to: GDate): number {
         sql`${taskOccurrences.periodEnd} >= ${from}`,
         sql`${taskOccurrences.periodEnd} <= ${to}`,
         sql`${taskOccurrences.periodKey} like 'D:%'`,
+        sourceDepartmentId
+          ? eq(taskOccurrences.sourceDepartmentId, sourceDepartmentId)
+          : undefined,
       ),
     )
     .all();
@@ -317,25 +328,19 @@ export function aggregateByDepartment(actor: AuthUser, filters: ReportFilters) {
   const statusExpr = rateStatusSql(Date.now());
   const rows = db
     .select({
-      departmentId: sql<number | null>`coalesce(${userDepartments.departmentId}, ${users.departmentId})`,
+      departmentId: taskOccurrences.sourceDepartmentId,
       departmentName: departments.name,
       status: statusExpr,
       c: count(),
     })
     .from(taskOccurrences)
     .innerJoin(taskTemplates, eq(taskOccurrences.templateId, taskTemplates.id))
-    .innerJoin(users, eq(taskOccurrences.userId, users.id))
-    .leftJoin(userDepartments, eq(userDepartments.userId, users.id))
-    .leftJoin(
+    .innerJoin(
       departments,
-      sql`${departments.id} = coalesce(${userDepartments.departmentId}, ${users.departmentId})`,
+      eq(departments.id, taskOccurrences.sourceDepartmentId),
     )
     .where(and(...clauses))
-    .groupBy(
-      sql`coalesce(${userDepartments.departmentId}, ${users.departmentId})`,
-      departments.name,
-      statusExpr,
-    )
+    .groupBy(taskOccurrences.sourceDepartmentId, departments.name, statusExpr)
     .all();
 
   const map = new Map<string, { name: string; counts: StatusCounts }>();

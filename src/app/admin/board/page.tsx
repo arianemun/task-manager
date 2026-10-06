@@ -21,14 +21,22 @@ import {
 import { fa } from "@/lib/i18n/fa";
 import { toFaDigits } from "@/lib/utils";
 import { loadBoardDay, loadBoardPeriod } from "@/server/queries/board";
+import { listDepartmentsSimple } from "@/server/queries/tasks";
 import { generateOccurrences } from "@/server/services/occurrence-generate";
 
 type Props = {
   searchParams: Promise<{
     date?: string;
     tab?: string;
+    departmentId?: string;
   }>;
 };
+
+function boardHref(tab: string, date: string, departmentId: number | null) {
+  const params = new URLSearchParams({ tab, date });
+  if (departmentId) params.set("departmentId", String(departmentId));
+  return `/admin/board?${params.toString()}`;
+}
 
 export default async function BoardPage({ searchParams }: Props) {
   const actor = await requireUserOrRedirect({
@@ -43,10 +51,23 @@ export default async function BoardPage({ searchParams }: Props) {
   // اطمینان از وجود occurrence دوره جاری
   generateOccurrences({ skipCursorUpdate: true, from: date, to: date });
 
+  const parsedDepartment = Number(sp.departmentId);
+  const departmentId =
+    sp.departmentId &&
+    Number.isInteger(parsedDepartment) &&
+    parsedDepartment > 0
+      ? parsedDepartment
+      : null;
+  const departments =
+    actor.role === "ADMIN"
+      ? listDepartmentsSimple()
+      : listDepartmentsSimple().filter((item) =>
+          actor.departmentIds.includes(item.id),
+        );
   const data =
     tab === "day"
-      ? loadBoardDay(actor, date)
-      : loadBoardPeriod(actor, tab, date);
+      ? loadBoardDay(actor, date, departmentId)
+      : loadBoardPeriod(actor, tab, date, departmentId);
 
   const j = toJalali(date);
   const prev = addGregorianDays(date, -1);
@@ -65,20 +86,20 @@ export default async function BoardPage({ searchParams }: Props) {
         <div className="flex items-center gap-2">
           <Button asChild size="icon" variant="outline">
             <Link
-              href={`/admin/board?tab=${tab}&date=${prev}`}
+              href={boardHref(tab, prev, departmentId)}
               aria-label="روز قبل"
             >
               <ChevronRight className="size-4" />
             </Link>
           </Button>
           <Button asChild variant="secondary" size="sm">
-            <Link href={`/admin/board?tab=${tab}&date=${todayTehran()}`}>
+            <Link href={boardHref(tab, todayTehran(), departmentId)}>
               امروز
             </Link>
           </Button>
           <Button asChild size="icon" variant="outline">
             <Link
-              href={`/admin/board?tab=${tab}&date=${next}`}
+              href={boardHref(tab, next, departmentId)}
               aria-label="روز بعد"
             >
               <ChevronLeft className="size-4" />
@@ -86,6 +107,30 @@ export default async function BoardPage({ searchParams }: Props) {
           </Button>
         </div>
       </div>
+
+      <form action="/admin/board" className="flex flex-wrap items-center gap-2">
+        <input type="hidden" name="tab" value={tab} />
+        <input type="hidden" name="date" value={date} />
+        <label className="text-sm" htmlFor="board-department">
+          دپارتمان منبع
+        </label>
+        <select
+          id="board-department"
+          name="departmentId"
+          defaultValue={departmentId ? String(departmentId) : ""}
+          className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+        >
+          <option value="">همه</option>
+          {departments.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+        <Button type="submit" size="sm" variant="outline">
+          اعمال
+        </Button>
+      </form>
 
       <div className="flex flex-wrap gap-2">
         {(
@@ -101,7 +146,7 @@ export default async function BoardPage({ searchParams }: Props) {
             size="sm"
             variant={tab === key ? "default" : "outline"}
           >
-            <Link href={`/admin/board?tab=${key}&date=${date}`}>{label}</Link>
+            <Link href={boardHref(key, date, departmentId)}>{label}</Link>
           </Button>
         ))}
       </div>

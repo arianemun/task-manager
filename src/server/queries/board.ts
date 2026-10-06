@@ -125,7 +125,11 @@ function buildSummary(
 }
 
 /** یک کوئری aggregate برای ماتریس روز (D/O که بازه‌شان شامل تاریخ است) */
-export function loadBoardDay(actor: AuthUser, date: GDate): BoardPayload {
+export function loadBoardDay(
+  actor: AuthUser,
+  date: GDate,
+  departmentId?: number | null,
+): BoardPayload {
   const staff = scopedStaff(actor);
   const staffIds = staff.map((s) => s.id);
 
@@ -163,6 +167,9 @@ export function loadBoardDay(actor: AuthUser, date: GDate): BoardPayload {
         sql`${taskOccurrences.periodStart} <= ${date}`,
         sql`${taskOccurrences.periodEnd} >= ${date}`,
         sql`(${taskOccurrences.periodKey} like 'D:%' OR ${taskOccurrences.periodKey} like 'O:%')`,
+        departmentId
+          ? eq(taskOccurrences.sourceDepartmentId, departmentId)
+          : undefined,
       ),
     )
     .all();
@@ -203,6 +210,7 @@ export function loadBoardPeriod(
   actor: AuthUser,
   kind: "week" | "month",
   anchor: GDate,
+  departmentId?: number | null,
 ): BoardPayload {
   const start =
     kind === "week" ? startOfJalaliWeek(anchor) : startOfJalaliMonth(anchor);
@@ -246,6 +254,9 @@ export function loadBoardPeriod(
         sql`${taskOccurrences.periodKey} like ${prefix + "%"}`,
         sql`${taskOccurrences.periodStart} <= ${end}`,
         sql`${taskOccurrences.periodEnd} >= ${start}`,
+        departmentId
+          ? eq(taskOccurrences.sourceDepartmentId, departmentId)
+          : undefined,
       ),
     )
     .all();

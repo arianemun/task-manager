@@ -85,6 +85,16 @@ export function listStaffForActor(
         ),
         ${departments.name}
       )`,
+      sourceTaskCount: filters.departmentId
+        ? sql<number>`(
+            select count(*) from task_occurrences
+            where user_id = ${users.id}
+              and source_department_id = ${filters.departmentId}
+          )`.mapWith(Number)
+        : sql<number>`(
+            select count(*) from task_occurrences
+            where user_id = ${users.id}
+          )`.mapWith(Number),
       lastLoginAt: users.lastLoginAt,
       mustChangePassword: users.mustChangePassword,
     })

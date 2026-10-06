@@ -13,6 +13,7 @@ export type StaffRow = {
   role: keyof typeof fa.roles;
   departmentName: string | null;
   isActive: boolean;
+  sourceTaskCount: number;
 };
 
 type Props = {
@@ -30,7 +31,12 @@ const columns: DataTableColumnDef<StaffRow>[] = [
     meta: { label: "نام" },
     header: "نام",
     cell: ({ row }) => (
-      <span className="font-medium">{row.original.fullName}</span>
+      <span className="font-medium">
+        {row.original.fullName}
+        <span className="text-muted-foreground ms-2 text-xs font-normal">
+          {row.original.sourceTaskCount.toLocaleString("fa-IR")} کار
+        </span>
+      </span>
     ),
     renderMobileCard: (row) => (
       <div className="space-y-1">

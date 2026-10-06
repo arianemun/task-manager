@@ -62,7 +62,7 @@ export function listTasksForActor(actor: AuthUser, filters: TaskListFilters = {}
       ? [filters.departmentId]
       : [];
   if (departmentFilter.length > 0) {
-    const ids = db
+    const assigned = db
       .select({ templateId: taskAssignments.templateId })
       .from(taskAssignments)
       .where(
@@ -72,7 +72,14 @@ export function listTasksForActor(actor: AuthUser, filters: TaskListFilters = {}
         ),
       )
       .all()
-      .map((r) => r.templateId);
+      .map((row) => row.templateId);
+    const sourced = db
+      .select({ templateId: taskOccurrences.templateId })
+      .from(taskOccurrences)
+      .where(inArray(taskOccurrences.sourceDepartmentId, departmentFilter))
+      .all()
+      .map((row) => row.templateId);
+    const ids = [...new Set([...assigned, ...sourced])];
     if (ids.length === 0) return [];
     conditions.push(inArray(taskTemplates.id, ids));
   }
