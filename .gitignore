@@ -32,14 +32,16 @@ yarn-error.log*
 
 # env files
 .env
+.cron.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 !.env.example
 
-# local data, SQLite DB & uploads & backups
+# local data, SQLite DB & uploads & backups & cron logs
 /data
+/logs
 *.db
 *.db-*
 /uploads
