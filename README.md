@@ -131,24 +131,58 @@ NODE_ENV=production node server.js
 
 ### ۶) Cron در aaPanel
 
-در **Cron** چهار کار زمان‌بندی کنید (منطقه زمانی سرور = تهران یا با `TZ=Asia/Tehran`):
+اسکریپت‌ها مسیر پروژه را از محل خودشان پیدا می‌کنند و `node` را در زمان اجرا حل می‌کنند: اول `NODE_BIN` در `.cron.env`، بعد `node` در `PATH`، بعد جدیدترین `/www/server/nodejs/*/bin/node`. `npm` صدا زده نمی‌شود. هر کار با `flock` از اجرای هم‌زمان جلوگیری می‌کند و لاگ را در `LOG_DIR` (پیش‌فرض `logs/` داخل پروژه) با تاریخ و زمان تهران می‌نویسد. لاگ‌های `*.log` قدیمی‌تر از `LOG_RETENTION_DAYS` (پیش‌فرض ۳۰ روز) پاک می‌شوند.
 
-| زمان | فرمان |
-|---|---|
-| `05 0 * * *` | `cd /path/to/task-manager && /usr/bin/npm run cron:generate` |
-| `55 23 * * *` | `cd /path/to/task-manager && /usr/bin/npm run cron:close` |
-| `15 2 * * *` | `cd /path/to/task-manager && /usr/bin/npm run db:backup` |
-| `25 2 * * *` | `cd /path/to/task-manager && /usr/bin/npm run db:check >> /path/to/task-manager/logs/db-check-$(date +\%F).log 2>&1` |
-
-`db:check` بعد از بکاپ روزانه اجرا می‌شود. فقط می‌خواند و ردیف کاری را اصلاح نمی‌کند؛ خلاصهٔ آخرین اجرا در `settings` ذخیره می‌شود. اگر مشکلی باشد کد خروج ۱ است و خروجی به لاگ همان روز اضافه می‌شود (`>>`).
-
-نمونهٔ فرمان در aaPanel (فیلد Script؛ زمان‌بندی جدا: هر روز ۰۲:۲۵):
+تنظیم اختیاری:
 
 ```bash
-cd /www/wwwroot/task-manager && /www/server/nodejs/v24.12.0/bin/npm run db:check >> /www/server/nodejs/vhost/logs/db-check-$(date +%F).log 2>&1
+cp .cron.env.example .cron.env
 ```
 
-یا HTTP (با هدر):
+در aaPanel برای هر کار فقط همین یک خط را در فیلد Script بگذارید (زمان‌بندی جداگانه است):
+
+```bash
+bash /www/wwwroot/task-manager/scripts/cron/generate.sh
+bash /www/wwwroot/task-manager/scripts/cron/backup.sh
+bash /www/wwwroot/task-manager/scripts/cron/db-check.sh
+bash /www/wwwroot/task-manager/scripts/cron/close-periods.sh
+```
+
+زمان‌بندی به وقت تهران:
+
+| کار | زمان | خط aaPanel |
+|---|---|---|
+| generate | ۰۰:۰۵ | `bash /www/wwwroot/task-manager/scripts/cron/generate.sh` |
+| backup | ۰۲:۰۰ | `bash /www/wwwroot/task-manager/scripts/cron/backup.sh` |
+| db-check | ۰۲:۲۵ | `bash /www/wwwroot/task-manager/scripts/cron/db-check.sh` |
+| close-periods | ۲۳:۵۵ | `bash /www/wwwroot/task-manager/scripts/cron/close-periods.sh` |
+
+ساعت‌های بالا وقتی درست‌اند که timezone سیستم `Asia/Tehran` باشد. aaPanel همان ساعت سیستم را برای Cron استفاده می‌کند. بررسی:
+
+```bash
+timedatectl
+```
+
+اگر `Time zone` تهران نیست:
+
+```bash
+sudo timedatectl set-timezone Asia/Tehran
+```
+
+تهران نسبت به UTC همیشه `+03:30` است و ساعت تابستانی ندارد. اگر سرور روی UTC بماند، همین کارها را این‌طور زمان‌بندی کنید:
+
+| کار تهران | معادل UTC |
+|---|---|
+| ۰۰:۰۵ | ۲۰:۳۵ روز قبل |
+| ۰۲:۰۰ | ۲۲:۳۰ روز قبل |
+| ۰۲:۲۵ | ۲۲:۵۵ روز قبل |
+| ۲۳:۵۵ | ۲۰:۲۵ همان روز |
+
+مهر زمان داخل لاگ‌ها با `TZ=Asia/Tehran` نوشته می‌شود، حتی اگر ساعت Cron روی UTC باشد.
+
+`db:check` فقط می‌خواند و ردیف کاری را اصلاح نمی‌کند. خلاصهٔ آخرین اجرا در `settings` می‌ماند. اگر مشکلی باشد کد خروج ۱ است.
+
+جایگزین HTTP (به اسکریپت‌های بالا ترجیح داده نمی‌شود):
 
 ```bash
 curl -X POST https://YOUR_HOST/api/cron/generate \
@@ -156,6 +190,29 @@ curl -X POST https://YOUR_HOST/api/cron/generate \
 curl -X POST https://YOUR_HOST/api/cron/close-periods \
   -H "Authorization: Bearer $CRON_SECRET"
 ```
+
+#### عیب‌یابی Cron
+
+اگر در داشبورد مدیر Alert زرد «بررسی سلامت داده اجرا نشده» دیده شد:
+
+1. لاگ همان روز را در `LOG_DIR` ببینید. پیش‌فرض `logs/db-check-YYYY-MM-DD.log` داخل پروژه است. اگر `LOG_DIR` در `.cron.env` عوض شده، همان مسیر را باز کنید.
+2. خط `node:` ابتدای لاگ را چک کنید. اگر فایلی نیست یا لاگ با «node پیدا نشد» تمام شده، `NODE_BIN` را در `.cron.env` روی فایل اجرایی node همان سرور بگذارید.
+3. اگر لاگ اصلاً ساخته نشده، در aaPanel ببینید خط Script همان `bash .../scripts/cron/db-check.sh` است و زمان‌بندی فعال است.
+
+#### تست دستی روی سرور
+
+از ریشهٔ پروژه، یا با مسیر کامل:
+
+```bash
+bash /www/wwwroot/task-manager/scripts/cron/db-check.sh
+bash /www/wwwroot/task-manager/scripts/cron/backup.sh
+bash /www/wwwroot/task-manager/scripts/cron/generate.sh
+bash /www/wwwroot/task-manager/scripts/cron/close-periods.sh
+echo $?
+tail -n 20 /www/wwwroot/task-manager/logs/db-check-$(TZ=Asia/Tehran date +%F).log
+```
+
+`db-check` دادهٔ کاری را عوض نمی‌کند. `backup` فایل بکاپ می‌سازد. `generate` نمونهٔ دوره‌ها را می‌سازد و `close-periods` دوره‌های گذشتهٔ بی‌پاسخ را `MISSED` می‌کند؛ این دو را فقط وقتی عمداً می‌خواهید وضعیت کارها به‌روز شود اجرا کنید. پایان هر لاگ باید `کد خروج 0` باشد، مگر `db-check` مشکلی پیدا کرده باشد.
 
 ---
 
@@ -213,7 +270,7 @@ seed را در آپدیت عادی دوباره اجرا نکنید مگر نی�
 | `npm run bench:reports` | زمان اندازه‌گیری‌شده کوئری‌های گزارش → `docs/BENCH_REPORTS.md` |
 | `npm run db:check` | بررسی فقط‌خواندنی سلامت داده؛ خروج ۱ اگر مشکلی باشد |
 | `npm run db:backup` / `db:restore` | بکاپ / بازیابی |
-| `npm run cron:generate` / `cron:close` | کارهای زمان‌بندی |
+| `npm run cron:generate` / `cron:close` | کارهای زمان‌بندی از npm؛ روی سرور از `scripts/cron/*.sh` استفاده کنید |
 | `npm test` / `lint` | تست و لینت |
 
 ---
@@ -234,7 +291,8 @@ seed را در آپدیت عادی دوباره اجرا نکنید مگر نی�
 | CSS/فونت در production نیست | `npm run build` را دوباره بزنید؛ وجود `.next/standalone/public` و `.next/standalone/.next/static` را چک کنید |
 | خطای SESSION_SECRET هنگام استارت | secret را طولانی و غیرپیش‌فرض کنید |
 | `better-sqlite3` بیلد نمی‌شود | `build-essential` و `python3` نصب شود؛ سپس `npm rebuild better-sqlite3` |
-| Cron کار نمی‌کند | مسیر `npm`، `cwd` پروژه و `CRON_SECRET` را بررسی کنید |
+| Cron کار نمی‌کند | لاگ `logs/` و خط `node:` را ببینید؛ در صورت نیاز `NODE_BIN` را در `.cron.env` بگذارید |
+| Alert زرد «بررسی سلامت داده اجرا نشده» | اول لاگ‌های `LOG_DIR` و مسیر node در ابتدای لاگ `db-check` را چک کنید |
 | لاگین بعد از دیپلوی قطع می‌شود | `SESSION_SECRET` را عوض نکرده باشید؛ کوکی Secure فقط روی HTTPS |
 | DB پاک شده بعد از دیپلوی | `DATABASE_URL` را خارج از پوشه build بگذارید |
 | قفل فایل روی ویندوز (EBUSY) | اپ را ببندید؛ در صورت نیاز `npm run db:reset` فقط در توسعه |
