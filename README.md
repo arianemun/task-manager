@@ -131,13 +131,22 @@ NODE_ENV=production node server.js
 
 ### ۶) Cron در aaPanel
 
-در **Cron** سه کار زمان‌بندی کنید (منطقه زمانی سرور = تهران یا با `TZ=Asia/Tehran`):
+در **Cron** چهار کار زمان‌بندی کنید (منطقه زمانی سرور = تهران یا با `TZ=Asia/Tehran`):
 
 | زمان | فرمان |
 |---|---|
 | `05 0 * * *` | `cd /path/to/task-manager && /usr/bin/npm run cron:generate` |
 | `55 23 * * *` | `cd /path/to/task-manager && /usr/bin/npm run cron:close` |
 | `15 2 * * *` | `cd /path/to/task-manager && /usr/bin/npm run db:backup` |
+| `25 2 * * *` | `cd /path/to/task-manager && /usr/bin/npm run db:check >> /path/to/task-manager/logs/db-check-$(date +\%F).log 2>&1` |
+
+`db:check` بعد از بکاپ روزانه اجرا می‌شود. فقط می‌خواند و ردیف کاری را اصلاح نمی‌کند؛ خلاصهٔ آخرین اجرا در `settings` ذخیره می‌شود. اگر مشکلی باشد کد خروج ۱ است و خروجی به لاگ همان روز اضافه می‌شود (`>>`).
+
+نمونهٔ فرمان در aaPanel (فیلد Script؛ زمان‌بندی جدا: هر روز ۰۲:۲۵):
+
+```bash
+cd /www/wwwroot/task-manager && /www/server/nodejs/v24.12.0/bin/npm run db:check >> /www/server/nodejs/vhost/logs/db-check-$(date +%F).log 2>&1
+```
 
 یا HTTP (با هدر):
 
@@ -202,6 +211,7 @@ seed را در آپدیت عادی دوباره اجرا نکنید مگر نی�
 | `npm run db:seed` | seed (prod: فقط admin) |
 | `npm run db:seed:large` | داده حجیم برای بنچمارک |
 | `npm run bench:reports` | زمان اندازه‌گیری‌شده کوئری‌های گزارش → `docs/BENCH_REPORTS.md` |
+| `npm run db:check` | بررسی فقط‌خواندنی سلامت داده؛ خروج ۱ اگر مشکلی باشد |
 | `npm run db:backup` / `db:restore` | بکاپ / بازیابی |
 | `npm run cron:generate` / `cron:close` | کارهای زمان‌بندی |
 | `npm test` / `lint` | تست و لینت |

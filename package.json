@@ -14,6 +14,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:seed:large": "tsx src/db/seed-large.ts",
     "db:reset": "node scripts/db-reset.mjs",
+    "db:check": "tsx scripts/db-check.ts",
     "db:backup": "tsx scripts/db-backup.ts",
     "db:restore": "tsx scripts/db-restore.ts",
     "bench:reports": "tsx scripts/bench-reports.ts",

@@ -27,9 +27,10 @@ import {
   type RecurrenceConfig,
   type RecurrenceTemplateInput,
 } from "@/lib/recurrence";
+import { LAST_OCCURRENCE_GENERATED_KEY } from "@/lib/settings/system-keys";
 import { syncPendingGroupClosures } from "@/server/services/group-completion";
 
-const LAST_GEN_KEY = "last_occurrence_generated_date";
+const LAST_GEN_KEY = LAST_OCCURRENCE_GENERATED_KEY;
 export const MAX_CATCHUP_DAYS = 62;
 
 export type GenerateResult = {

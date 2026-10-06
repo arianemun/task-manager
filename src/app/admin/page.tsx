@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DataHealthAlerts } from "@/components/admin/data-health-alerts";
 import { StatusDonut, TrendAreaChart } from "@/components/reports/charts";
 import { PageHeader } from "@/components/layout/page-header";
 import { Stack } from "@/components/layout/stack";
@@ -13,6 +14,7 @@ import { requireUserOrRedirect } from "@/lib/auth/redirect";
 import { fa } from "@/lib/i18n/fa";
 import { EMPTY_RATE_HINT, parseReportFilters } from "@/lib/reports";
 import { toFaDigits } from "@/lib/utils";
+import { loadLastHealthReport } from "@/lib/health/db-check";
 import {
   aggregateByDay,
   aggregateStatusDonut,
@@ -33,8 +35,14 @@ export default async function AdminDashboardPage() {
   const trend = aggregateByDay(actor, { ...monthFilters, granularity: "day" });
   const donut = aggregateStatusDonut(actor, monthFilters);
 
+  const healthReport =
+    actor.role === "ADMIN" ? loadLastHealthReport() : null;
+
   return (
     <Stack>
+      {actor.role === "ADMIN" ? (
+        <DataHealthAlerts report={healthReport} />
+      ) : null}
       <PageHeader
         title={fa.nav.dashboard}
         description={
