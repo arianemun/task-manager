@@ -44,6 +44,10 @@ export function computeStreaks(daysNewestFirst: StreakDay[]): StreakResult {
   return { current, best };
 }
 
+function isStatusExcluded(status: string): boolean {
+  return status === "EXCUSED" || status === "PENDING" || status === "DONE_BY_PEER";
+}
+
 export function completionRate(
   doneCount: number,
   totalCountable: number,
@@ -57,9 +61,7 @@ export function countableCompletion(statuses: string[]): {
   total: number;
   rate: number | null;
 } {
-  const countable = statuses.filter(
-    (s) => s !== "EXCUSED" && s !== "PENDING",
-  );
+  const countable = statuses.filter((s) => !isStatusExcluded(s));
   const done = countable.filter(
     (s) => s === "DONE" || s === "DONE_LATE",
   ).length;

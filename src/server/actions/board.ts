@@ -14,7 +14,10 @@ import {
   excuseOccurrencesInRange,
   generateOccurrences,
 } from "@/server/services/occurrence-generate";
-import { recordGroupOutcome } from "@/server/services/group-completion";
+import {
+  recordGroupOutcome,
+  releaseSharedPeers,
+} from "@/server/services/group-completion";
 import type { ActionResult } from "./auth";
 
 const statusSchema = z.enum([
@@ -95,13 +98,14 @@ export async function updateOccurrenceStatusAction(
           .run();
       }
     } else {
+      if (status === "PENDING") releaseSharedPeers(occurrenceId);
       db.update(taskOccurrences)
         .set({
           status,
           note: reason,
-          completedAt: occ.completedAt,
-          completedByUserId:
-            status === "PENDING" ? null : occ.completedByUserId,
+          completedAt: status === "PENDING" ? null : occ.completedAt,
+          completedByUserId: status === "PENDING" ? null : occ.completedByUserId,
+          doneByOccurrenceId: status === "PENDING" ? null : occ.doneByOccurrenceId,
           updatedAt: new Date(),
         })
         .where(eq(taskOccurrences.id, occurrenceId))

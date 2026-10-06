@@ -84,6 +84,7 @@ export default async function EditTaskPage({ params }: Props) {
             requiresNote: t.requiresNote,
             requiresAttachment: t.requiresAttachment,
             skipHolidays: t.skipHolidays,
+            completionMode: t.completionMode,
             startDate: t.startDate,
             endDate: t.endDate,
             dueTime: t.dueTime,

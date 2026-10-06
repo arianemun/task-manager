@@ -13,7 +13,8 @@ import {
   departmentNamesForUser,
   userInDepartmentsSql,
 } from "@/lib/departments/membership";
-import { personalCreditSql } from "@/lib/tasks/group-work";
+import { rateStatusSql } from "@/lib/reports/rate-sql";
+import { openPeriodCounts } from "@/server/queries/report-core";
 import {
   addGregorianDays,
   jalaliWeekday,
@@ -25,7 +26,9 @@ import {
   bucketDayAggregates,
   computeStreaks,
   parseReportFilters,
+  mergeStatusCounts,
   ratesFromCounts,
+  sharedPeriodsRate,
   type ReportFilters,
   type StatusCounts,
   type StreakDay,
@@ -39,6 +42,8 @@ const STATUS_COLS = [
   "NOT_DONE",
   "MISSED",
   "EXCUSED",
+  "OVERDUE",
+  "DONE_BY_PEER",
 ] as const;
 
 function scopedUserIds(actor: AuthUser, filters: ReportFilters): number[] | null {
@@ -74,15 +79,15 @@ function scopedUserIds(actor: AuthUser, filters: ReportFilters): number[] | null
 function baseOccurrenceWhere(
   actor: AuthUser,
   filters: ReportFilters,
-  options?: { personalCreditOnly?: boolean },
+  options?: { personalCreditOnly?: boolean; period?: boolean },
 ): { clauses: SQL[]; userIds: number[] | null } {
   const userIds = scopedUserIds(actor, filters);
-  const clauses: SQL[] = [
-    sql`${taskOccurrences.periodEnd} >= ${filters.from}`,
-    sql`${taskOccurrences.periodEnd} <= ${filters.to}`,
-  ];
-  if (options?.personalCreditOnly !== false) {
-    clauses.push(personalCreditSql());
+  const clauses: SQL[] = [];
+  if (options?.period !== false) {
+    clauses.push(
+      sql`${taskOccurrences.periodEnd} >= ${filters.from}`,
+      sql`${taskOccurrences.periodEnd} <= ${filters.to}`,
+    );
   }
   if (userIds) {
     if (userIds.length === 0) {
@@ -121,16 +126,17 @@ function pivotStatusRows(
 /** تجمیع روزانه بر اساس period_end */
 export function aggregateByDay(actor: AuthUser, filters: ReportFilters) {
   const { clauses } = baseOccurrenceWhere(actor, filters);
+  const statusExpr = rateStatusSql(Date.now());
   const rows = db
     .select({
       day: taskOccurrences.periodEnd,
-      status: taskOccurrences.status,
+      status: statusExpr,
       c: count(),
     })
     .from(taskOccurrences)
     .innerJoin(taskTemplates, eq(taskOccurrences.templateId, taskTemplates.id))
     .where(and(...clauses))
-    .groupBy(taskOccurrences.periodEnd, taskOccurrences.status)
+    .groupBy(taskOccurrences.periodEnd, statusExpr)
     .all();
 
   const byDay = pivotStatusRows(rows, "day");
@@ -142,6 +148,8 @@ export function aggregateByDay(actor: AuthUser, filters: ReportFilters) {
     NOT_DONE: v.NOT_DONE,
     MISSED: v.MISSED,
     EXCUSED: v.EXCUSED,
+    OVERDUE: v.OVERDUE,
+    DONE_BY_PEER: v.DONE_BY_PEER,
   }));
 
   const buckets = bucketDayAggregates(dayAggs, filters.granularity);
@@ -165,33 +173,40 @@ export function aggregateByDay(actor: AuthUser, filters: ReportFilters) {
 
 export function aggregateStatusDonut(actor: AuthUser, filters: ReportFilters) {
   const { clauses } = baseOccurrenceWhere(actor, filters);
+  const statusExpr = rateStatusSql(Date.now());
   const rows = db
     .select({
-      status: taskOccurrences.status,
+      status: statusExpr,
       c: count(),
     })
     .from(taskOccurrences)
     .innerJoin(taskTemplates, eq(taskOccurrences.templateId, taskTemplates.id))
     .where(and(...clauses))
-    .groupBy(taskOccurrences.status)
+    .groupBy(statusExpr)
     .all();
 
   const counts: StatusCounts = {};
   for (const r of rows) {
     counts[r.status as keyof StatusCounts] = Number(r.c);
   }
-  return { counts, rates: ratesFromCounts(counts) };
+  const { clauses: openClauses } = baseOccurrenceWhere(actor, filters, {
+    period: false,
+  });
+  const open = openPeriodCounts(openClauses, filters.from, filters.to);
+  const merged = mergeStatusCounts(counts, open.counts);
+  return { counts: merged, rates: ratesFromCounts(merged) };
 }
 
 export function aggregateByStaff(actor: AuthUser, filters: ReportFilters) {
   const { clauses } = baseOccurrenceWhere(actor, filters);
+  const statusExpr = rateStatusSql(Date.now());
   const rows = db
     .select({
       userId: taskOccurrences.userId,
       fullName: users.fullName,
       departmentId: users.departmentId,
       departmentName: departments.name,
-      status: taskOccurrences.status,
+      status: statusExpr,
       c: count(),
     })
     .from(taskOccurrences)
@@ -204,7 +219,7 @@ export function aggregateByStaff(actor: AuthUser, filters: ReportFilters) {
       users.fullName,
       users.departmentId,
       departments.name,
-      taskOccurrences.status,
+      statusExpr,
     )
     .all();
 
@@ -229,6 +244,16 @@ export function aggregateByStaff(actor: AuthUser, filters: ReportFilters) {
     cur.counts[r.status as keyof StatusCounts] =
       (cur.counts[r.status as keyof StatusCounts] ?? 0) + Number(r.c);
     map.set(r.userId, cur);
+  }
+
+  const { clauses: openClauses } = baseOccurrenceWhere(actor, filters, {
+    period: false,
+  });
+  const open = openPeriodCounts(openClauses, filters.from, filters.to);
+  for (const [userId, extra] of open.byUser) {
+    const cur = map.get(userId);
+    if (!cur) continue;
+    cur.counts = mergeStatusCounts(cur.counts, extra);
   }
 
   const list = [...map.values()].map((u) => {
@@ -277,7 +302,9 @@ function bestStreakForUser(userId: number, from: GDate, to: GDate): number {
   const days: StreakDay[] = [...byDay.entries()]
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([date, statuses]) => {
-      const actionable = statuses.filter((s) => s !== "EXCUSED" && s !== "PENDING");
+      const actionable = statuses.filter(
+        (s) => s !== "EXCUSED" && s !== "PENDING" && s !== "DONE_BY_PEER",
+      );
       if (actionable.length === 0) return { date, kind: "skip" as const };
       const allDone = actionable.every((s) => s === "DONE" || s === "DONE_LATE");
       return { date, kind: "work" as const, allDone };
@@ -287,11 +314,12 @@ function bestStreakForUser(userId: number, from: GDate, to: GDate): number {
 
 export function aggregateByDepartment(actor: AuthUser, filters: ReportFilters) {
   const { clauses } = baseOccurrenceWhere(actor, filters);
+  const statusExpr = rateStatusSql(Date.now());
   const rows = db
     .select({
       departmentId: sql<number | null>`coalesce(${userDepartments.departmentId}, ${users.departmentId})`,
       departmentName: departments.name,
-      status: taskOccurrences.status,
+      status: statusExpr,
       c: count(),
     })
     .from(taskOccurrences)
@@ -306,7 +334,7 @@ export function aggregateByDepartment(actor: AuthUser, filters: ReportFilters) {
     .groupBy(
       sql`coalesce(${userDepartments.departmentId}, ${users.departmentId})`,
       departments.name,
-      taskOccurrences.status,
+      statusExpr,
     )
     .all();
 
@@ -331,17 +359,18 @@ export function aggregateByDepartment(actor: AuthUser, filters: ReportFilters) {
 
 export function aggregateWorstTasks(actor: AuthUser, filters: ReportFilters) {
   const { clauses } = baseOccurrenceWhere(actor, filters);
+  const statusExpr = rateStatusSql(Date.now());
   const rows = db
     .select({
       templateId: taskOccurrences.templateId,
       title: taskTemplates.title,
-      status: taskOccurrences.status,
+      status: statusExpr,
       c: count(),
     })
     .from(taskOccurrences)
     .innerJoin(taskTemplates, eq(taskOccurrences.templateId, taskTemplates.id))
     .where(and(...clauses))
-    .groupBy(taskOccurrences.templateId, taskTemplates.title, taskOccurrences.status)
+    .groupBy(taskOccurrences.templateId, taskTemplates.title, statusExpr)
     .all();
 
   const map = new Map<number, { title: string; counts: StatusCounts }>();
@@ -355,7 +384,10 @@ export function aggregateWorstTasks(actor: AuthUser, filters: ReportFilters) {
   return [...map.entries()]
     .map(([templateId, v]) => {
       const rates = ratesFromCounts(v.counts);
-      const fail = (v.counts.NOT_DONE ?? 0) + (v.counts.MISSED ?? 0);
+      const fail =
+        (v.counts.NOT_DONE ?? 0) +
+        (v.counts.MISSED ?? 0) +
+        (v.counts.OVERDUE ?? 0);
       return { templateId, title: v.title, fail, ...rates };
     })
     .sort((a, b) => b.fail - a.fail)
@@ -473,12 +505,13 @@ export function aggregateReasons(actor: AuthUser, filters: ReportFilters) {
 
 export function staffDayHeatmap(actor: AuthUser, filters: ReportFilters) {
   const { clauses } = baseOccurrenceWhere(actor, filters);
+  const statusExpr = rateStatusSql(Date.now());
   const rows = db
     .select({
       userId: taskOccurrences.userId,
       fullName: users.fullName,
       day: taskOccurrences.periodEnd,
-      status: taskOccurrences.status,
+      status: statusExpr,
       c: count(),
     })
     .from(taskOccurrences)
@@ -491,7 +524,7 @@ export function staffDayHeatmap(actor: AuthUser, filters: ReportFilters) {
       taskOccurrences.userId,
       users.fullName,
       taskOccurrences.periodEnd,
-      taskOccurrences.status,
+      statusExpr,
     )
     .all();
 
@@ -605,6 +638,35 @@ export function listOccurrenceDetails(
     page: filters.page,
     pageSize: filters.pageSize,
     rates,
+  };
+}
+
+/** درصد دوره‌های کار SHARED که حداقل یک عضو انجام داده است. */
+export function sharedGroupSummary(actor: AuthUser, filters: ReportFilters) {
+  const { clauses } = baseOccurrenceWhere(actor, filters);
+  const rows = db
+    .select({
+      templateId: taskOccurrences.templateId,
+      periodKey: taskOccurrences.periodKey,
+      status: taskOccurrences.status,
+    })
+    .from(taskOccurrences)
+    .innerJoin(taskTemplates, eq(taskOccurrences.templateId, taskTemplates.id))
+    .where(and(...clauses, eq(taskTemplates.completionMode, "SHARED")))
+    .all();
+
+  const doneByPeriod = new Map<string, boolean>();
+  for (const row of rows) {
+    const key = `${row.templateId}:${row.periodKey}`;
+    const done = row.status === "DONE" || row.status === "DONE_LATE";
+    doneByPeriod.set(key, (doneByPeriod.get(key) ?? false) || done);
+  }
+  const periods = doneByPeriod.size;
+  const donePeriods = [...doneByPeriod.values()].filter(Boolean).length;
+  return {
+    periods,
+    donePeriods,
+    rate: sharedPeriodsRate(donePeriods, periods),
   };
 }
 

@@ -9,6 +9,8 @@ export const STATUS_CHART_COLORS: Record<string, string> = {
   MISSED: "var(--status-missed)",
   PENDING: "var(--status-pending)",
   EXCUSED: "var(--status-excused)",
+  DONE_BY_PEER: "var(--muted-foreground)",
+  OVERDUE: "var(--status-late)",
 };
 
 export const CHART_PRIMARY = "var(--primary)";
@@ -29,6 +31,8 @@ export const statusChartConfig = {
   MISSED: { label: fa.status.MISSED, color: "var(--status-missed)" },
   PENDING: { label: fa.status.PENDING, color: "var(--status-pending)" },
   EXCUSED: { label: fa.status.EXCUSED, color: "var(--status-excused)" },
+  DONE_BY_PEER: { label: fa.status.DONE_BY_PEER, color: "var(--muted-foreground)" },
+  OVERDUE: { label: fa.status.OVERDUE, color: "var(--status-late)" },
 } satisfies ChartConfig;
 
 export const deptStackChartConfig = {

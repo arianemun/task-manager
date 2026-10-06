@@ -37,6 +37,7 @@ import {
   aggregateWeekdayRates,
   aggregateWorstTasks,
   listOccurrenceDetails,
+  sharedGroupSummary,
   staffDayHeatmap,
 } from "@/server/queries/admin-reports";
 
@@ -109,6 +110,7 @@ export default async function StaffDetailPage({ params, searchParams }: Props) {
     const reasons = aggregateReasons(actor, filters);
     const heatmap = staffDayHeatmap(actor, filters);
     const details = listOccurrenceDetails(actor, filters);
+    const sharedGroup = sharedGroupSummary(actor, filters);
     const canExport =
       actor.role === "ADMIN" || actor.permissions.includes("reports.export");
 
@@ -143,6 +145,7 @@ export default async function StaffDetailPage({ params, searchParams }: Props) {
           reasons={reasons}
           heatmap={heatmap}
           details={details}
+          sharedGroup={sharedGroup}
         />
       </Stack>
     );

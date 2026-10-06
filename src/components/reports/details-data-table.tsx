@@ -114,8 +114,8 @@ export function DetailsDataTable({
   return (
     <div className="space-y-3">
       <p className="text-muted-foreground text-sm">
-        KPI قابل‌شمارش این فیلتر: {toFaDigits(countable)} — باید با جمع
-        ردیف‌های غیر PENDING/EXCUSED هم‌خوان باشد.
+        KPI قابل‌شمارش این فیلتر: {toFaDigits(countable)}. ردیف‌های در جریان،
+        معاف و انجام‌شده توسط همکار در درصد نیستند.
       </p>
       <DataTable
         columns={columns}

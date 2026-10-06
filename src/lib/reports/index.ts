@@ -16,6 +16,8 @@ export {
   isExcludedFromRate,
   mergeStatusCounts,
   sumCounts,
+  sharedPeriodsRate,
+  EMPTY_RATE_HINT,
   type StatusCounts,
 } from "./rates";
 export {

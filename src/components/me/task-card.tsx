@@ -152,6 +152,7 @@ export function TaskCard({ occ, reasons }: Props) {
         responded && "bg-muted/20",
         justSaved && responded && "scale-[0.99] opacity-90",
         locked && "opacity-80",
+        closedByOther && "text-muted-foreground",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -215,8 +216,7 @@ export function TaskCard({ occ, reasons }: Props) {
 
       {closedByOther ? (
         <p className="text-muted-foreground text-sm">
-          {occ.completedByName ?? "همکار"} این کار گروهی را ثبت کرده و برای شما
-          بسته شده است.
+          انجام‌شده توسط {occ.completedByName ?? "همکار"}
         </p>
       ) : locked ? (
         <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
@@ -254,14 +254,14 @@ export function TaskCard({ occ, reasons }: Props) {
         </div>
       )}
 
-      {occ.groupTask && !closedByOther && !locked && !responded ? (
+      {occ.completionMode === "SHARED" && !closedByOther && !locked && !responded ? (
         <p className="text-muted-foreground text-xs">
-          کار گروهی است. با ثبت شما برای بقیه اعضای دپارتمان هم بسته می‌شود.
+          کار مشترک است. با انجام شما، برای بقیه اعضا بدون اثر روی درصدشان بسته می‌شود.
         </p>
       ) : null}
-      {occ.groupTask && !closedByOther && responded ? (
+      {occ.completionMode === "SHARED" && !closedByOther && responded && (local.status === "DONE" || local.status === "DONE_LATE") ? (
         <p className="text-muted-foreground text-xs">
-          شما این کار گروهی را ثبت کردید.
+          شما این کار مشترک را ثبت کردید.
         </p>
       ) : null}
 

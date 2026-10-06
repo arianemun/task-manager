@@ -54,7 +54,11 @@ export async function GET(request: Request) {
     summary.addRow({ k: "تا", v: jTo });
     summary.addRow({
       k: "درصد انجام",
-      v: donut.rates.completionRate ?? null,
+      v: donut.rates.completionRate == null ? null : donut.rates.completionRate,
+    });
+    summary.addRow({
+      k: "در جریان",
+      v: donut.rates.inProgress,
     });
     summary.addRow({ k: "به‌موقع", v: donut.rates.onTimeRate ?? null });
     summary.addRow({ k: "قابل شمارش", v: donut.rates.countable });
@@ -63,9 +67,10 @@ export async function GET(request: Request) {
     summary.addRow({ k: "تأخیر", v: donut.rates.doneLate });
     summary.addRow({ k: "انجام‌نشده", v: donut.rates.notDone });
     summary.addRow({ k: "فراموش", v: donut.rates.missed });
-    summary.getCell(3, 2).numFmt = "0.0";
-    summary.getCell(4, 2).numFmt = "0.0";
-    for (let r = 5; r <= 10; r++) {
+    if (donut.rates.completionRate != null) summary.getCell(3, 2).numFmt = "0.0";
+    summary.getCell(4, 2).numFmt = "0";
+    if (donut.rates.onTimeRate != null) summary.getCell(5, 2).numFmt = "0.0";
+    for (let r = 6; r <= 11; r++) {
       summary.getCell(r, 2).numFmt = "0";
     }
 
@@ -91,10 +96,11 @@ export async function GET(request: Request) {
         late: s.doneLate,
         nd: s.notDone,
         miss: s.missed,
-        rate: s.completionRate,
+        rate: s.completionRate == null ? null : s.completionRate,
         streak: s.bestStreak,
       });
       for (let c = 2; c <= 8; c++) {
+        if (c === 7 && s.completionRate == null) continue;
         row.getCell(c).numFmt = "0";
       }
     }

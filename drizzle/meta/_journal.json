@@ -71,6 +71,13 @@
       "when": 1791300796866,
       "tag": "0009_user_departments",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791309875188,
+      "tag": "0010_completion_mode",
+      "breakpoints": true
     }
   ]
 }

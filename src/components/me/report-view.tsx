@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/chart";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toJalali } from "@/lib/dates";
+import { EMPTY_RATE_HINT } from "@/lib/reports";
 import { fa } from "@/lib/i18n/fa";
 import { toFaDigits } from "@/lib/utils";
 import { CheckCircle2 } from "lucide-react";
@@ -48,6 +49,7 @@ export function ReportView({ data }: { data: Report }) {
               ? "—"
               : `${toFaDigits(data.weekStats.rate)}٪`
           }
+          hint={data.weekStats.rate == null ? EMPTY_RATE_HINT : undefined}
         />
         <Kpi
           label="انجام این ماه"
@@ -56,6 +58,15 @@ export function ReportView({ data }: { data: Report }) {
               ? "—"
               : `${toFaDigits(data.monthStats.rate)}٪`
           }
+          hint={data.monthStats.rate == null ? EMPTY_RATE_HINT : undefined}
+        />
+        <Kpi
+          label="در جریان این هفته"
+          value={toFaDigits(data.weekRates.inProgress)}
+        />
+        <Kpi
+          label="در جریان این ماه"
+          value={toFaDigits(data.monthRates.inProgress)}
         />
         <Kpi label="انجام‌شده" value={toFaDigits(data.counts.done)} />
         <Kpi label="انجام‌نشده" value={toFaDigits(data.counts.notDone)} />
@@ -148,10 +159,12 @@ function Kpi({
   label,
   value,
   className,
+  hint,
 }: {
   label: string;
   value: string;
   className?: string;
+  hint?: string;
 }) {
   return (
     <Card className={className}>
@@ -160,6 +173,9 @@ function Kpi({
         <p className="text-kpi tabular-nums" data-kpi>
           {value}
         </p>
+        {hint ? (
+          <p className="text-muted-foreground text-xs leading-relaxed">{hint}</p>
+        ) : null}
       </CardContent>
     </Card>
   );

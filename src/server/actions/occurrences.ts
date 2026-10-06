@@ -37,7 +37,11 @@ function assertCanMutateOccurrence(
   if (compareGDate(occ.periodStart, today) > 0) {
     throw new Error("FUTURE");
   }
-  if (occ.status === "MISSED" || occ.status === "EXCUSED") {
+  if (
+    occ.status === "MISSED" ||
+    occ.status === "EXCUSED" ||
+    occ.status === "DONE_BY_PEER"
+  ) {
     throw new Error("LOCKED");
   }
   // ویرایش پاسخ فقط تا پایان دوره

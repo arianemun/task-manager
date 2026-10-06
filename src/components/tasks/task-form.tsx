@@ -54,6 +54,7 @@ type Props = {
     requiresNote: boolean;
     requiresAttachment: boolean;
     skipHolidays: boolean;
+    completionMode?: "INDIVIDUAL" | "SHARED";
     startDate: string;
     endDate: string | null;
     dueTime: string | null;
@@ -85,6 +86,9 @@ export function TaskForm({
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
   const [endDate, setEndDate] = useState<string | null>(initial?.endDate ?? null);
   const [skipHolidays, setSkipHolidays] = useState(initial?.skipHolidays ?? true);
+  const [completionMode, setCompletionMode] = useState<"INDIVIDUAL" | "SHARED">(
+    initial?.completionMode ?? "INDIVIDUAL",
+  );
   const [categoryId, setCategoryId] = useState(
     initial?.categoryId ? String(initial.categoryId) : "",
   );
@@ -250,6 +254,41 @@ export function TaskForm({
               name="skipHolidays"
               value={skipHolidays ? "true" : "false"}
             />
+            <fieldset className="w-full space-y-2">
+              <legend className="text-sm font-medium">نحوه تکمیل</legend>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="completionMode"
+                  value="INDIVIDUAL"
+                  checked={completionMode === "INDIVIDUAL"}
+                  onChange={() => setCompletionMode("INDIVIDUAL")}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="font-medium">فردی</span>
+                  <span className="text-muted-foreground block text-xs">
+                    هر عضو جدا پاسخ می‌دهد و فقط درصد خودش عوض می‌شود.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="completionMode"
+                  value="SHARED"
+                  checked={completionMode === "SHARED"}
+                  onChange={() => setCompletionMode("SHARED")}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="font-medium">مشترک</span>
+                  <span className="text-muted-foreground block text-xs">
+                    انجام یک نفر کافی است. بقیه نه امتیاز می‌گیرند و نه جریمه.
+                  </span>
+                </span>
+              </label>
+            </fieldset>
             <label className="flex items-center gap-2 text-sm">
               <Switch
                 checked={requiresNote}

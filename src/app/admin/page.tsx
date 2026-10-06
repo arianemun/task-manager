@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card";
 import { requireUserOrRedirect } from "@/lib/auth/redirect";
 import { fa } from "@/lib/i18n/fa";
-import { parseReportFilters } from "@/lib/reports";
+import { EMPTY_RATE_HINT, parseReportFilters } from "@/lib/reports";
 import { toFaDigits } from "@/lib/utils";
 import {
   aggregateByDay,
@@ -59,6 +59,7 @@ export default async function AdminDashboardPage() {
               ? "—"
               : `${toFaDigits(kpis.today.completionRate)}٪`
           }
+          hint={kpis.today.completionRate == null ? EMPTY_RATE_HINT : `در جریان: ${toFaDigits(kpis.today.inProgress)}`}
         />
         <Kpi
           label="درصد انجام این هفته"
@@ -67,6 +68,7 @@ export default async function AdminDashboardPage() {
               ? "—"
               : `${toFaDigits(kpis.week.completionRate)}٪`
           }
+          hint={kpis.week.completionRate == null ? EMPTY_RATE_HINT : `در جریان: ${toFaDigits(kpis.week.inProgress)}`}
         />
         <Kpi
           label="درصد انجام این ماه"
@@ -75,6 +77,7 @@ export default async function AdminDashboardPage() {
               ? "—"
               : `${toFaDigits(kpis.month.completionRate)}٪`
           }
+          hint={kpis.month.completionRate == null ? EMPTY_RATE_HINT : `در جریان: ${toFaDigits(kpis.month.inProgress)}`}
           className="col-span-2 lg:col-span-1"
         />
       </div>
@@ -157,10 +160,12 @@ function Kpi({
   label,
   value,
   className,
+  hint,
 }: {
   label: string;
   value: string;
   className?: string;
+  hint?: string;
 }) {
   return (
     <Card className={className}>
@@ -169,6 +174,9 @@ function Kpi({
         <p className="text-kpi tabular-nums" data-kpi>
           {value}
         </p>
+        {hint ? (
+          <p className="text-muted-foreground text-xs leading-relaxed">{hint}</p>
+        ) : null}
       </CardContent>
     </Card>
   );

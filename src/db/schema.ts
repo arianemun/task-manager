@@ -6,6 +6,7 @@ import {
   primaryKey,
   uniqueIndex,
   index,
+  type AnySQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 
 /* ─── Enums as string unions (SQLite) ─── */
@@ -42,6 +43,9 @@ export type RecurrenceType = (typeof RECURRENCE_TYPES)[number];
 export const ASSIGNEE_TYPES = ["USER", "DEPARTMENT"] as const;
 export type AssigneeType = (typeof ASSIGNEE_TYPES)[number];
 
+export const COMPLETION_MODES = ["INDIVIDUAL", "SHARED"] as const;
+export type CompletionMode = (typeof COMPLETION_MODES)[number];
+
 export const OCCURRENCE_STATUSES = [
   "PENDING",
   "DONE",
@@ -49,6 +53,7 @@ export const OCCURRENCE_STATUSES = [
   "NOT_DONE",
   "MISSED",
   "EXCUSED",
+  "DONE_BY_PEER",
 ] as const;
 export type OccurrenceStatus = (typeof OCCURRENCE_STATUSES)[number];
 
@@ -251,6 +256,11 @@ export const taskTemplates = sqliteTable(
     skipHolidays: integer("skip_holidays", { mode: "boolean" })
       .notNull()
       .default(true),
+    /** INDIVIDUAL: هر عضو جدا. SHARED: انجام یک نفر برای دوره کافی است. */
+    completionMode: text("completion_mode")
+      .$type<CompletionMode>()
+      .notNull()
+      .default("INDIVIDUAL"),
     isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
     createdBy: integer("created_by")
       .notNull()
@@ -321,6 +331,11 @@ export const taskOccurrences = sqliteTable(
     completedByUserId: integer("completed_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
+    /** برای DONE_BY_PEER: occurrence کسی که کار SHARED را انجام داده. */
+    doneByOccurrenceId: integer("done_by_occurrence_id").references(
+      (): AnySQLiteColumn => taskOccurrences.id,
+      { onDelete: "set null" },
+    ),
     /** زمان آخرین ویرایش پاسخ پس از ثبت اول */
     editedAt: integer("edited_at", { mode: "timestamp_ms" }),
     reviewedBy: integer("reviewed_by").references(() => users.id, {
@@ -348,6 +363,7 @@ export const taskOccurrences = sqliteTable(
     index("task_occurrences_period_end_idx").on(t.periodEnd),
     index("task_occurrences_user_period_end_idx").on(t.userId, t.periodEnd),
     index("task_occurrences_completed_by_idx").on(t.completedByUserId),
+    index("task_occurrences_done_by_occ_idx").on(t.doneByOccurrenceId),
   ],
 );
 

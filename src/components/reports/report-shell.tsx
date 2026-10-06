@@ -19,7 +19,7 @@ import { REPORT_TABS } from "@/components/reports/report-tab-defs";
 import { ReportTabsNav } from "@/components/reports/report-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ratesFromCounts } from "@/lib/reports";
+import { EMPTY_RATE_HINT, ratesFromCounts } from "@/lib/reports";
 import {
   Card,
   CardContent,
@@ -65,6 +65,7 @@ type Props = {
   reasons: ReturnType<typeof aggregateReasons>;
   heatmap: ReturnType<typeof staffDayHeatmap>;
   details: ReturnType<typeof listOccurrenceDetails>;
+  sharedGroup?: { periods: number; donePeriods: number; rate: number | null };
 };
 
 function tabHref(
@@ -182,7 +183,24 @@ export function ReportShell(props: Props) {
                   ? "—"
                   : `${toFaDigits(rates.completionRate)}٪`
               }
+              hint={rates.completionRate == null ? EMPTY_RATE_HINT : undefined}
             />
+            <Kpi label="در جریان" value={toFaDigits(rates.inProgress)} />
+            {props.sharedGroup ? (
+              <Kpi
+                label="کارهای مشترک"
+                value={
+                  props.sharedGroup.rate == null
+                    ? "—"
+                    : `${toFaDigits(props.sharedGroup.rate)}٪`
+                }
+                hint={
+                  props.sharedGroup.rate == null
+                    ? "دوره مشترک ارزیابی‌شده‌ای در این بازه نیست"
+                    : `${toFaDigits(props.sharedGroup.donePeriods)} از ${toFaDigits(props.sharedGroup.periods)} دوره با حداقل یک انجام`
+                }
+              />
+            ) : null}
             <Kpi
               label="به‌موقع"
               value={
@@ -382,12 +400,23 @@ export function ReportShell(props: Props) {
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
+function Kpi({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
   return (
     <Card className="report-chart-card" data-kpi>
       <CardHeader className="pb-2">
         <CardDescription>{label}</CardDescription>
         <CardTitle className="text-2xl">{value}</CardTitle>
+        {hint ? (
+          <p className="text-muted-foreground text-xs leading-relaxed">{hint}</p>
+        ) : null}
       </CardHeader>
     </Card>
   );

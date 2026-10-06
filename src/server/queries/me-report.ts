@@ -92,7 +92,10 @@ export function loadMeReport(userId: number) {
       continue;
     }
     const actionable = daily.filter(
-      (r) => r.status !== "EXCUSED" && r.status !== "PENDING",
+      (r) =>
+        r.status !== "EXCUSED" &&
+        r.status !== "PENDING" &&
+        r.status !== "DONE_BY_PEER",
     );
     if (actionable.length === 0) {
       streakDays.push({ date, kind: "skip" });

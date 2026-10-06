@@ -80,6 +80,8 @@ export const fa = {
     NOT_DONE: "انجام نشد",
     MISSED: "فراموش‌شده",
     EXCUSED: "معاف",
+    DONE_BY_PEER: "انجام‌شده توسط همکار",
+    OVERDUE: "عقب‌افتاده",
   },
 
   priority: {

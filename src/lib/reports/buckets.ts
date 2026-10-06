@@ -55,6 +55,8 @@ export function bucketDayAggregates(
           NOT_DONE: d.NOT_DONE,
           MISSED: d.MISSED,
           EXCUSED: d.EXCUSED,
+          OVERDUE: d.OVERDUE,
+          DONE_BY_PEER: d.DONE_BY_PEER,
         };
       });
   }
@@ -80,6 +82,8 @@ export function bucketDayAggregates(
       "NOT_DONE",
       "MISSED",
       "EXCUSED",
+      "OVERDUE",
+      "DONE_BY_PEER",
     ] as const) {
       cur.counts[status] = (cur.counts[status] ?? 0) + (d[status] ?? 0);
     }

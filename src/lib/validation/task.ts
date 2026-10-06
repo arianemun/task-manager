@@ -78,6 +78,7 @@ export const taskFormSchema = z
     requiresNote: z.boolean().default(false),
     requiresAttachment: z.boolean().default(false),
     skipHolidays: z.boolean().default(true),
+    completionMode: z.enum(["INDIVIDUAL", "SHARED"]).default("INDIVIDUAL"),
     startDate: gDate,
     endDate: gDate.nullable().optional(),
     dueTime: z

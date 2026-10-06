@@ -33,6 +33,7 @@ type Props = {
   heatmap: ReturnType<typeof staffDayHeatmap>;
   details: ReturnType<typeof listOccurrenceDetails>;
   lockUserId: number;
+  sharedGroup?: { periods: number; donePeriods: number; rate: number | null };
 };
 
 /** جدا از page تا import نمودار فقط با تب گزارش وارد گراف شود */

@@ -10,7 +10,6 @@ import {
   type OccurrenceStatus,
   type Priority,
 } from "@/db/schema";
-import { groupMemberUserIds } from "@/lib/tasks/group-work";
 import {
   addGregorianDays,
   compareGDate,
@@ -54,6 +53,7 @@ export type MeOccurrence = {
   completedByUserId: number | null;
   completedByName: string | null;
   fulfilledByOther: boolean;
+  completionMode: "INDIVIDUAL" | "SHARED";
 };
 
 function sortOcc(a: MeOccurrence, b: MeOccurrence): number {
@@ -83,6 +83,7 @@ export function loadMeToday(userId: number) {
       attachmentPath: taskOccurrences.attachmentPath,
       editedAt: taskOccurrences.editedAt,
       completedByUserId: taskOccurrences.completedByUserId,
+      completionMode: taskTemplates.completionMode,
       title: taskTemplates.title,
       description: taskTemplates.description,
       priority: taskTemplates.priority,
@@ -103,15 +104,6 @@ export function loadMeToday(userId: number) {
     )
     .all();
 
-  const groupCache = new Map<number, Set<number>>();
-  const groupSet = (templateId: number) => {
-    let set = groupCache.get(templateId);
-    if (!set) {
-      set = new Set(groupMemberUserIds(templateId));
-      groupCache.set(templateId, set);
-    }
-    return set;
-  };
   const completerIds = [
     ...new Set(
       rows
@@ -137,7 +129,8 @@ export function loadMeToday(userId: number) {
 
   for (const r of rows) {
     const fulfilledByOther =
-      r.completedByUserId != null && r.completedByUserId !== userId;
+      r.status === "DONE_BY_PEER" ||
+      (r.completedByUserId != null && r.completedByUserId !== userId);
     const locked =
       compareGDate(r.periodEnd, today) < 0 ||
       r.status === "MISSED" ||
@@ -167,8 +160,8 @@ export function loadMeToday(userId: number) {
       daysLeft,
       group: "today",
       locked,
-      groupTask:
-        groupSet(r.templateId).has(userId) || r.completedByUserId != null,
+      groupTask: r.completionMode === "SHARED",
+      completionMode: r.completionMode,
       completedByUserId: r.completedByUserId,
       completedByName: r.completedByUserId
         ? (completerNames.get(r.completedByUserId) ?? null)

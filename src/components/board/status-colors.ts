@@ -5,6 +5,7 @@ import {
   Clock,
   HelpCircle,
   Timer,
+  UserCheck,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -20,6 +21,7 @@ export const STATUS_COLORS: Record<
   NOT_DONE: { bg: "bg-status-not-done", label: "انجام نشد" },
   MISSED: { bg: "bg-status-missed", label: "فراموش‌شده" },
   EXCUSED: { bg: "bg-status-excused", label: "معاف" },
+  DONE_BY_PEER: { bg: "bg-muted", label: "انجام‌شده توسط همکار" },
 };
 
 export const STATUS_DOT: Record<OccurrenceStatus, string> = {
@@ -29,6 +31,7 @@ export const STATUS_DOT: Record<OccurrenceStatus, string> = {
   NOT_DONE: "dot-status-not-done",
   MISSED: "dot-status-missed",
   EXCUSED: "dot-status-excused",
+  DONE_BY_PEER: "dot-status-pending",
 };
 
 export const STATUS_ICONS: Record<OccurrenceStatus, LucideIcon> = {
@@ -38,4 +41,5 @@ export const STATUS_ICONS: Record<OccurrenceStatus, LucideIcon> = {
   NOT_DONE: X,
   MISSED: HelpCircle,
   EXCUSED: Ban,
+  DONE_BY_PEER: UserCheck,
 };
