@@ -9,6 +9,7 @@ import { isAuthError } from "@/lib/auth/errors";
 import { requireUser } from "@/lib/auth/user";
 import { compareGDate, todayTehran } from "@/lib/dates";
 import { statusFromCompletion } from "@/lib/recurrence";
+import { isStaffResponseLocked } from "@/lib/tasks/response-lock";
 import { saveOccurrenceAttachment } from "@/lib/uploads/attachment";
 import { getNotDoneReasonsForDepartments } from "@/lib/settings/not-done-reasons";
 import { recordGroupOutcome } from "@/server/services/group-completion";
@@ -37,15 +38,15 @@ function assertCanMutateOccurrence(
   if (compareGDate(occ.periodStart, today) > 0) {
     throw new Error("FUTURE");
   }
+  // قفل با period_end است، نه با انتظار برای MISSED در close-periods.
+  // due_at اینجا دخیل نیست؛ statusFromCompletion ثبت دیرهنگام را DONE_LATE می‌کند.
   if (
-    occ.status === "MISSED" ||
-    occ.status === "EXCUSED" ||
-    occ.status === "DONE_BY_PEER"
+    isStaffResponseLocked({
+      status: occ.status,
+      periodEnd: occ.periodEnd,
+      today,
+    })
   ) {
-    throw new Error("LOCKED");
-  }
-  // ویرایش پاسخ فقط تا پایان دوره
-  if (occ.status !== "PENDING" && compareGDate(occ.periodEnd, today) < 0) {
     throw new Error("LOCKED");
   }
 }
