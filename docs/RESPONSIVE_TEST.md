@@ -1,0 +1,89 @@
+# تست ریسپانسیو — صفحات `/me` (فاز D)
+
+تاریخ: ۱۴۰۴/۰۷/۱۴ · به‌روزرسانی فاز F: ۱۴۰۴/۰۷/۱۴
+
+## عرض‌های هدف
+
+| عرض | جهت | نتیجه |
+|---|---|---|
+| ۳۲۰px | عمودی | ✅ تقویم بدون overflow-x؛ کارت کار؛ دکمه‌های تمام‌عرض؛ bottom nav |
+| ۳۶۰px | عمودی | ✅ همان |
+| ۳۹۰px | عمودی | ✅ greeting، progress، sticky هدر گروه |
+| گوشی افقی | افقی | ✅ محتوا در viewport؛ bottom nav |
+| تبلت (۷۶۸–۱۰۲۴) | — | ✅ sidebar آیکنی پیش‌فرض (CSS mq)؛ بدون پرش |
+| دسکتاپ (≥۱۰۲۴) | — | ✅ sidebar کامل |
+
+## بزرگ‌نمایی
+
+- [x] زوم ۲۰۰٪ روی `/me` — اسکرول عمودی کافی؛ دکمه‌ها قابل کلیک (بازرسی کد + layout)
+
+## صفحات دیگر `/me`
+
+- [x] `/me/calendar` ۳۲۰px + Drawer جزئیات
+- [x] `/me/report` KPI دو ستونه + Chart
+- [x] `/me/info` empty state / pinned
+- [x] `/me/profile` آواتار + تغییر رمز ResponsiveDialog
+
+## چاپ
+
+- [x] گزارش‌ها بدون sidebar / هدر / bottom nav (`globals.css` `@media print`)
+
+---
+
+# تست ریسپانسیو — صفحات مدیر (فاز E)
+
+## Sidebar تبلت
+
+- [x] ۷۶۸–۱۰۲۴ بدون کوکی: آیکنی از همان paint اول (`sidebar-mq-prefer-icon`)
+- [x] پس از باز کردن دستی، کوکی حفظ می‌شود
+
+## جداول
+
+- [x] `/admin/staff` کارت زیر md؛ جدول md+؛ فیلتر Sheet + badge
+- [x] `/admin/tasks`، `/admin/holidays`، `/admin/audit` همان الگو
+- [x] `/admin/departments`، `/admin/announcements` → DataTable (فاز F)
+- [x] صفحه‌بندی و pageSize در URL
+
+## بورد
+
+- [x] sticky هدر/ستون؛ اسکرول افقی
+- [x] رنگ + آیکن سلول
+- [x] Popover دسکتاپ / Drawer موبایل
+- [x] Accordion موبایل
+- [x] معافیت گروهی ResponsiveDialog
+
+## فرم‌ها
+
+- [x] پرسنل / کار / تعطیلی / اطلاعیه / note — Form یا AlertDialog طبق UI_AUDIT §۸
+- [x] ذخیره sticky موبایل روی فرم‌های بلند
+
+## سایر
+
+- [x] `/admin/staff/[id]` تب اسکرول افقی
+- [x] تنظیمات Tabs
+- [x] دکمه‌های آیکنی `aria-label` فارسی
+
+---
+
+# تست ریسپانسیو — گزارش‌ها (فاز F)
+
+| عرض | چک‌لیست | نتیجه |
+|---|---|---|
+| ۳۲۰–۳۹۰px | فیلتر Sheet + badge؛ Select تب؛ Excel/چاپ در ⋯ | ✅ کد + build |
+| ۳۲۰–۳۹۰px | ارتفاع کوتاه‌تر؛ legend زیر؛ tick بدون هم‌پوشانی | ✅ `charts.tsx` + `CHART_H` |
+| ۳۲۰–۳۹۰px | Top ۱۰ + نمایش همه؛ هیت‌مپ اسکرول + sticky + Popover | ✅ |
+| ≥۶۴۰px (`sm`) | تب افقی اسکرول؛ تب فعال در دید | ✅ CSS dual-render |
+| ≥۷۶۸px (`md`) | فیلتر inline؛ اکشن بیرون منو | ✅ |
+
+## Empty / Loading / چاپ / جزئیات / تاریک
+
+- [x] EmptyChart + ChartSkeleton + `loading.tsx`
+- [x] چاپ A4 عرض کامل + `break-inside: avoid` + تمایز B&W
+- [x] DetailsDataTable کارت موبایل
+- [x] تم تاریک: توکن وضعیت، popover/sheet/drawer، محور نمودار (globals.css)
+
+### اتوماتیک
+
+- [x] `npm test` / `npm run lint` / `npm run build`
+- [x] Lighthouse موبایل — `docs/LIGHTHOUSE_F.md`
+- [x] FLJS — `docs/FLJS_COMPARE.md`

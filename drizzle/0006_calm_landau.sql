@@ -1,0 +1,2 @@
+CREATE INDEX `task_occurrences_period_end_idx` ON `task_occurrences` (`period_end`);--> statement-breakpoint
+CREATE INDEX `task_occurrences_user_period_end_idx` ON `task_occurrences` (`user_id`,`period_end`);

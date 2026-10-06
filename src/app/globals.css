@@ -1,0 +1,442 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─── Design tokens → Tailwind (@theme) ─── */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-status-done: var(--status-done);
+  --color-status-late: var(--status-late);
+  --color-status-not-done: var(--status-not-done);
+  --color-status-missed: var(--status-missed);
+  --color-status-pending: var(--status-pending);
+  --color-status-excused: var(--status-excused);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-vazirmatn);
+  --text-xs: var(--fs-xs);
+  --text-sm: var(--fs-sm);
+  --text-base: var(--fs-base);
+  --text-lg: var(--fs-lg);
+  --text-2xl: var(--fs-2xl);
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --shadow-soft: var(--shadow-soft);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+}
+
+/* ─── Light: zinc/neutral + یک accent ─── */
+:root {
+  --radius: 0.5rem;
+
+  /* تایپوگرافی — حداکثر ۵ اندازه، ۳ وزن */
+  --fs-xs: 0.75rem; /* ۱۲ */
+  --fs-sm: 0.875rem; /* ۱۴ */
+  --fs-base: 1rem; /* ۱۶ — حداقل موبایل/iOS */
+  --fs-lg: 1.125rem; /* ۱۸ */
+  --fs-2xl: 1.5rem; /* ۲۴ */
+
+  --background: oklch(0.995 0.002 286);
+  --foreground: oklch(0.21 0.006 286);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.006 286);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.006 286);
+
+  /* accent واحد (آبی-zinc ملایم) */
+  --primary: oklch(0.45 0.09 250);
+  --primary-foreground: oklch(0.99 0.002 286);
+  --secondary: oklch(0.96 0.004 286);
+  --secondary-foreground: oklch(0.28 0.01 286);
+  --muted: oklch(0.96 0.004 286);
+  --muted-foreground: oklch(0.5 0.015 286);
+  --accent: oklch(0.96 0.01 250);
+  --accent-foreground: oklch(0.28 0.04 250);
+  --destructive: oklch(0.55 0.2 25);
+  --destructive-foreground: oklch(0.99 0.002 286);
+  --border: oklch(0.91 0.006 286);
+  --input: oklch(0.91 0.006 286);
+  --ring: oklch(0.45 0.09 250);
+
+  --shadow-soft: 0 1px 2px oklch(0.21 0.006 286 / 0.04),
+    0 4px 12px oklch(0.21 0.006 286 / 0.04);
+
+  /* وضعیت کارها — Badge / بورد / تقویم / نمودار */
+  --status-done: oklch(0.55 0.14 150);
+  --status-late: oklch(0.7 0.14 75);
+  --status-not-done: oklch(0.58 0.18 35);
+  --status-missed: oklch(0.48 0.02 286);
+  --status-pending: oklch(0.55 0.06 250);
+  --status-excused: oklch(0.55 0.1 230);
+  --sidebar: oklch(0.985 0.004 286);
+  --sidebar-foreground: oklch(0.28 0.01 286);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.96 0.01 250);
+  --sidebar-accent-foreground: oklch(0.28 0.04 250);
+  --sidebar-border: oklch(0.91 0.006 286);
+  --sidebar-ring: var(--ring);
+}
+
+/* ─── Dark ─── */
+.dark {
+  --background: oklch(0.16 0.01 286);
+  --foreground: oklch(0.96 0.004 286);
+  --card: oklch(0.2 0.012 286);
+  --card-foreground: oklch(0.96 0.004 286);
+  --popover: oklch(0.2 0.012 286);
+  --popover-foreground: oklch(0.96 0.004 286);
+  --primary: oklch(0.72 0.1 250);
+  --primary-foreground: oklch(0.18 0.02 250);
+  --secondary: oklch(0.26 0.012 286);
+  --secondary-foreground: oklch(0.96 0.004 286);
+  --muted: oklch(0.26 0.012 286);
+  --muted-foreground: oklch(0.7 0.015 286);
+  --accent: oklch(0.28 0.03 250);
+  --accent-foreground: oklch(0.96 0.004 286);
+  --destructive: oklch(0.65 0.18 25);
+  --destructive-foreground: oklch(0.99 0.002 286);
+  --border: oklch(0.3 0.012 286);
+  --input: oklch(0.3 0.012 286);
+  --ring: oklch(0.72 0.1 250);
+
+  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.35),
+    0 4px 16px oklch(0 0 0 / 0.25);
+
+  /* وضعیت‌ها در تاریک — کنتراست بالاتر روی پس‌زمینه تیره */
+  --status-done: oklch(0.78 0.15 150);
+  --status-late: oklch(0.84 0.13 75);
+  --status-not-done: oklch(0.78 0.17 35);
+  --status-missed: oklch(0.74 0.02 286);
+  --status-pending: oklch(0.76 0.07 250);
+  --status-excused: oklch(0.78 0.11 230);
+  --sidebar: oklch(0.2 0.012 286);
+  --sidebar-foreground: oklch(0.96 0.004 286);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.28 0.03 250);
+  --sidebar-accent-foreground: oklch(0.96 0.004 286);
+  --sidebar-border: oklch(0.3 0.012 286);
+  --sidebar-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans text-base font-normal antialiased;
+    font-feature-settings: "ss01" on;
+    /* Vazirmatn در line-height کم فشرده می‌شود — docs/SPACING.md */
+    line-height: 1.7;
+  }
+
+  /* وزن‌های مجاز: ۴۰۰ / ۵۰۰ / ۶۰۰ */
+  h1,
+  h2,
+  h3 {
+    @apply font-semibold tracking-tight text-balance;
+  }
+
+  h1 {
+    font-size: var(--fs-2xl);
+    line-height: 1.4;
+  }
+
+  h2 {
+    font-size: var(--fs-lg);
+    line-height: 1.45;
+  }
+
+  h3 {
+    font-size: var(--fs-base);
+    line-height: 1.5;
+  }
+
+  p {
+    line-height: 1.7;
+  }
+
+  /* اعداد جدول و KPI */
+  .tabular-nums,
+  table,
+  [data-kpi] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* جلوگیری از zoom خودکار iOS روی فوکوس */
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
+}
+
+@layer utilities {
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .text-kpi {
+    font-size: var(--fs-2xl);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  /* وضعیت — استفاده در Badge / بورد / تقویم */
+  .bg-status-done {
+    background-color: color-mix(in oklch, var(--status-done) 22%, transparent);
+    color: var(--status-done);
+  }
+  .bg-status-late {
+    background-color: color-mix(in oklch, var(--status-late) 22%, transparent);
+    color: var(--status-late);
+  }
+  .bg-status-not-done {
+    background-color: color-mix(
+      in oklch,
+      var(--status-not-done) 22%,
+      transparent
+    );
+    color: var(--status-not-done);
+  }
+  .bg-status-missed {
+    background-color: color-mix(
+      in oklch,
+      var(--status-missed) 22%,
+      transparent
+    );
+    color: var(--status-missed);
+  }
+  .bg-status-pending {
+    background-color: color-mix(
+      in oklch,
+      var(--status-pending) 18%,
+      transparent
+    );
+    color: var(--status-pending);
+  }
+  .bg-status-excused {
+    background-color: color-mix(
+      in oklch,
+      var(--status-excused) 22%,
+      transparent
+    );
+    color: var(--status-excused);
+  }
+
+  .dot-status-done {
+    background-color: var(--status-done);
+  }
+  .dot-status-late {
+    background-color: var(--status-late);
+  }
+  .dot-status-not-done {
+    background-color: var(--status-not-done);
+  }
+  .dot-status-missed {
+    background-color: var(--status-missed);
+  }
+  .dot-status-pending {
+    background-color: var(--status-pending);
+  }
+  .dot-status-excused {
+    background-color: var(--status-excused);
+  }
+}
+
+@layer components {
+  /* Drawer / Sheet / Popover در تم تاریک — داخل @layer تا utility ها را نکشد */
+  .dark [data-slot="popover-content"],
+  .dark [data-slot="dropdown-menu-content"],
+  .dark [data-slot="select-content"],
+  .dark [data-slot="sheet-content"],
+  .dark [data-slot="drawer-content"] {
+    border-color: color-mix(in oklch, var(--border) 90%, white);
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
+
+  .dark [data-slot="chart"] .recharts-cartesian-axis-tick-value {
+    fill: var(--muted-foreground);
+  }
+
+  .dark [data-slot="chart"] .recharts-default-legend,
+  .dark [data-slot="chart"] .recharts-legend-item-text {
+    color: var(--foreground);
+  }
+}
+
+@layer base {
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* چاپ گزارش — A4، بدون پوسته، نمودار تمام‌عرض، تمایز B&W */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  aside,
+  header,
+  nav,
+  [data-sidebar],
+  [data-slot="sidebar"],
+  [data-slot="sidebar-gap"],
+  [data-slot="sidebar-container"],
+  [data-slot="sidebar-wrapper"] > [data-slot="sidebar"],
+  [data-app-header],
+  [data-bottom-nav],
+  .report-filters,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  main,
+  [data-slot="sidebar-inset"] {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .report-print-root {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .report-chart-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border-color: #999 !important;
+  }
+
+  /* عرض صفحه چاپ نه viewport */
+  .report-chart,
+  .report-chart-card [data-slot="chart"],
+  .report-chart-card .recharts-responsive-container,
+  .report-chart-card .recharts-wrapper,
+  .report-chart-card .recharts-surface {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .report-chart-card [data-slot="chart"],
+  .report-chart-card .recharts-responsive-container {
+    height: 200px !important;
+  }
+
+  /* سطوح خاکستری متمایز + هاشور برای B&W */
+  .chart-series-primary .recharts-rectangle,
+  .chart-series-primary.recharts-area-area,
+  .chart-series-done .recharts-rectangle {
+    fill: #1a1a1a !important;
+  }
+  .chart-series-late .recharts-rectangle {
+    fill: #666 !important;
+  }
+  .chart-series-not-done .recharts-rectangle {
+    fill: #444 !important;
+    stroke: #111 !important;
+    stroke-width: 0.75;
+  }
+  .chart-series-missed .recharts-rectangle {
+    fill: #999 !important;
+  }
+  .chart-series-avg {
+    stroke: #000 !important;
+    stroke-dasharray: 4 3 !important;
+  }
+
+  .heat-high {
+    background: #111 !important;
+    color: #111 !important;
+  }
+  .heat-mid {
+    background: repeating-linear-gradient(
+      45deg,
+      #555,
+      #555 1px,
+      #fff 1px,
+      #fff 4px
+    ) !important;
+    color: transparent !important;
+  }
+  .heat-low {
+    background: repeating-linear-gradient(
+      -45deg,
+      #888,
+      #888 1px,
+      #fff 1px,
+      #fff 3px
+    ) !important;
+    color: transparent !important;
+  }
+  .heat-none {
+    background: #eee !important;
+    border: 1px solid #ccc !important;
+  }
+
+  .report-chart-card .recharts-legend-item-text,
+  .report-chart-card .recharts-cartesian-axis-tick-value {
+    fill: #000 !important;
+  }
+
+  .report-title::after {
+    content: none;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}

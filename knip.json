@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "ecosystem.config.js",
+    "public/sw.js",
+    "scripts/*.{js,mjs,ts}"
+  ],
+  "ignore": [
+    "src/components/ui/**",
+    "scripts/sessions.json"
+  ],
+  "ignoreDependencies": [
+    "@types/bcryptjs",
+    "eslint-config-next"
+  ],
+  "ignoreBinaries": ["pm2"]
+}

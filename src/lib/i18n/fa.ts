@@ -1,0 +1,114 @@
+export const fa = {
+  appName: "سامانه مدیریت پرسنل",
+  appTagline: "پیگیری کارهای دوره‌ای و عملکرد پرسنل",
+
+  common: {
+    loading: "در حال بارگذاری…",
+    save: "ذخیره",
+    cancel: "انصراف",
+    delete: "حذف",
+    edit: "ویرایش",
+    create: "ایجاد",
+    search: "جستجو",
+    filter: "فیلتر",
+    export: "خروجی",
+    actions: "عملیات",
+    confirm: "تأیید",
+    back: "بازگشت",
+    next: "بعدی",
+    previous: "قبلی",
+    empty: "موردی یافت نشد",
+    error: "خطایی رخ داد",
+    success: "عملیات با موفقیت انجام شد",
+    active: "فعال",
+    inactive: "غیرفعال",
+    all: "همه",
+    yes: "بله",
+    no: "خیر",
+    download: "دانلود",
+    print: "چاپ",
+    close: "بستن",
+    view: "مشاهده",
+    settings: "تنظیمات",
+  },
+
+  auth: {
+    login: "ورود",
+    logout: "خروج",
+    username: "نام کاربری",
+    password: "رمز عبور",
+    changePassword: "تغییر رمز عبور",
+    currentPassword: "رمز فعلی",
+    newPassword: "رمز جدید",
+    confirmPassword: "تکرار رمز جدید",
+    mustChangePassword: "برای ادامه باید رمز عبور خود را تغییر دهید",
+    accountLocked: "حساب موقتاً قفل شده است. لطفاً بعداً تلاش کنید",
+    invalidCredentials: "نام کاربری یا رمز عبور نادرست است",
+    accountDisabled: "حساب کاربری غیرفعال است",
+  },
+
+  roles: {
+    ADMIN: "مدیر کل",
+    MANAGER: "سرپرست",
+    STAFF: "پرسنل",
+  },
+
+  nav: {
+    dashboard: "داشبورد",
+    staff: "پرسنل",
+    departments: "دپارتمان‌ها",
+    tasks: "کارها",
+    board: "پایش روزانه",
+    announcements: "اطلاعیه‌ها",
+    holidays: "تعطیلات",
+    reports: "گزارش‌ها",
+    audit: "لاگ فعالیت",
+    settings: "تنظیمات",
+    today: "امروز",
+    calendar: "تقویم",
+    myReport: "گزارش من",
+    myInfo: "اطلاعات من",
+    profile: "پروفایل",
+  },
+
+  status: {
+    PENDING: "در انتظار",
+    DONE: "انجام شد",
+    DONE_LATE: "انجام‌شده با تأخیر",
+    NOT_DONE: "انجام نشد",
+    MISSED: "فراموش‌شده",
+    EXCUSED: "معاف",
+  },
+
+  priority: {
+    LOW: "کم",
+    MEDIUM: "متوسط",
+    HIGH: "زیاد",
+  },
+
+  recurrence: {
+    ONCE: "یک‌باره",
+    DAILY: "روزانه",
+    WEEKLY: "هفتگی",
+    MONTHLY: "ماهانه",
+    CUSTOM: "سفارشی",
+  },
+
+  weekdays: {
+    0: "شنبه",
+    1: "یکشنبه",
+    2: "دوشنبه",
+    3: "سه‌شنبه",
+    4: "چهارشنبه",
+    5: "پنجشنبه",
+    6: "جمعه",
+  },
+
+  theme: {
+    light: "روشن",
+    dark: "تاریک",
+    system: "سیستم",
+  },
+} as const;
+
+export type FaDict = typeof fa;
