@@ -1,20 +1,30 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { randomBytes } from "node:crypto";
 import { and, desc, eq, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   conversationMembers,
   conversations,
   departments,
+  mediaJobs,
+  messageAttachments,
   messages,
   userDepartments,
   users,
   type ConversationMemberRole,
 } from "@/db/schema";
+import { fa } from "@/lib/i18n/fa";
 import { ChatError } from "./errors";
+import { sniffMedia } from "./media-sniff";
 import { assertSendRate } from "./rate-limit";
 import {
   CHAT_BODY_MAX,
   CHAT_EDIT_WINDOW_MS,
+  CHAT_IMAGE_MAX_BYTES,
   CHAT_PAGE_SIZE,
+  CHAT_VIDEO_MAX_BYTES,
+  type ChatAttachment,
   type ChatMessage,
   type ConversationSummary,
 } from "./types";
@@ -74,6 +84,7 @@ function mapMessage(
     replyToId: number | null;
   },
   reply: ChatMessage["replyTo"],
+  attachment: ChatMessage["attachment"] = null,
 ): ChatMessage {
   const deleted = row.deletedAt != null;
   return {
@@ -84,6 +95,7 @@ function mapMessage(
     senderActive: row.senderActive && row.senderDeleted == null,
     type: row.type,
     body: deleted ? null : row.body,
+    attachment: deleted ? null : (attachment ?? null),
     replyTo: reply,
     clientId: row.clientId,
     editedAt: row.editedAt?.getTime() ?? null,
@@ -92,7 +104,59 @@ function mapMessage(
   };
 }
 
-function loadMessage(id: number): ChatMessage | null {
+function uploadRoot(): string {
+  const dir = process.env.UPLOAD_DIR ?? "./uploads";
+  return path.isAbsolute(dir) ? dir : path.join(process.cwd(), dir);
+}
+
+function toAttachment(row: {
+  id: number;
+  kind: string;
+  status: ChatAttachment["status"];
+  path: string;
+  thumbPath: string | null;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+}): ChatAttachment {
+  const ready = row.status === "READY";
+  return {
+    id: row.id,
+    kind: row.kind === "video" ? "video" : "image",
+    status: row.status,
+    url: ready ? `/api/files/${row.path}` : null,
+    thumbUrl: ready && row.thumbPath ? `/api/files/${row.thumbPath}` : null,
+    width: row.width,
+    height: row.height,
+    durationMs: row.durationMs,
+  };
+}
+
+function attachmentFor(messageId: number, deleted: boolean): ChatAttachment | null {
+  if (deleted) return null;
+  const row = db
+    .select()
+    .from(messageAttachments)
+    .where(eq(messageAttachments.messageId, messageId))
+    .get();
+  return row ? toAttachment(row) : null;
+}
+
+function attachmentsForMessages(ids: number[]): Map<number, ChatAttachment> {
+  const map = new Map<number, ChatAttachment>();
+  if (ids.length === 0) return map;
+  const rows = db
+    .select()
+    .from(messageAttachments)
+    .where(inArray(messageAttachments.messageId, ids))
+    .all();
+  for (const row of rows) {
+    if (row.messageId != null) map.set(row.messageId, toAttachment(row));
+  }
+  return map;
+}
+
+export function loadMessage(id: number): ChatMessage | null {
   const row = db
     .select({
       id: messages.id,
@@ -114,7 +178,7 @@ function loadMessage(id: number): ChatMessage | null {
     .where(eq(messages.id, id))
     .get();
   if (!row) return null;
-  return mapMessage(row, replyPreview(row.replyToId));
+  return mapMessage(row, replyPreview(row.replyToId), attachmentFor(row.id, row.deletedAt != null));
 }
 
 function replyPreview(replyToId: number | null): ChatMessage["replyTo"] {
@@ -341,8 +405,14 @@ export function listMessages(input: {
       });
     }
   }
+  const ids = rows.map((row) => row.id);
+  const attachments = attachmentsForMessages(ids);
   return rows.map((row) =>
-    mapMessage(row, row.replyToId ? (replies.get(row.replyToId) ?? null) : null),
+    mapMessage(
+      row,
+      row.replyToId ? (replies.get(row.replyToId) ?? null) : null,
+      row.deletedAt ? null : (attachments.get(row.id) ?? null),
+    ),
   );
 }
 
@@ -510,6 +580,7 @@ export function listConversations(userId: number): ConversationSummary[] {
       : db
           .select({
             id: messages.id,
+            type: messages.type,
             body: messages.body,
             deletedAt: messages.deletedAt,
             createdAt: messages.createdAt,
@@ -546,7 +617,14 @@ export function listConversations(userId: number): ConversationSummary[] {
         title,
         avatarPath: conv.type === "DIRECT" ? (peer?.avatarPath ?? null) : conv.avatarPath,
         peerActive: conv.type === "GROUP" ? true : Boolean(peer?.isActive && !peer.deletedAt),
-        lastBody: last?.deletedAt ? null : (last?.body ?? null),
+        lastBody: last?.deletedAt
+          ? null
+          : last?.body ||
+            (last?.type === "IMAGE"
+              ? fa.chat.photo
+              : last?.type === "VIDEO"
+                ? fa.chat.video
+                : null),
         lastAt: last?.createdAt.getTime() ?? conv.updatedAt.getTime(),
         unread: Number(unread?.n ?? 0),
         pinned: mine?.pinned ?? false,
@@ -782,4 +860,99 @@ export function listDepartmentsForChat(): Array<{ id: number; name: string }> {
     .from(departments)
     .orderBy(departments.name)
     .all();
+}
+
+export async function createMediaMessage(input: {
+  userId: number;
+  conversationId: number;
+  clientId: string;
+  bytes: Buffer;
+  now?: number;
+}): Promise<ChatMessage> {
+  if (!input.clientId || input.clientId.length > 80) {
+    throw new ChatError("شناسه پیام نامعتبر است");
+  }
+  const prior = existingByClient(input.userId, input.clientId);
+  if (prior) return prior;
+  const sender = db
+    .select({ isActive: users.isActive, deletedAt: users.deletedAt })
+    .from(users)
+    .where(eq(users.id, input.userId))
+    .get();
+  if (!sender || !sender.isActive || sender.deletedAt) {
+    throw new ChatError("حساب غیرفعال است");
+  }
+  assertConversationMember(input.conversationId, input.userId);
+  const sniffed = sniffMedia(input.bytes);
+  if (!sniffed) throw new ChatError("فقط عکس jpg یا png یا webp، یا ویدیو mp4 یا webm مجاز است");
+  const limit = sniffed.kind === "video" ? CHAT_VIDEO_MAX_BYTES : CHAT_IMAGE_MAX_BYTES;
+  if (input.bytes.length <= 0 || input.bytes.length > limit) {
+    throw new ChatError(
+      sniffed.kind === "video"
+        ? "حجم ویدیو حداکثر ۱۰۰ مگابایت است"
+        : "حجم عکس حداکثر ۱۲ مگابایت است",
+    );
+  }
+  assertSendRate(input.userId, input.now ?? Date.now());
+  const now = new Date(input.now ?? Date.now());
+  const relDir = path.join("chat", String(input.conversationId));
+  const filename = `${randomBytes(8).toString("hex")}.${sniffed.ext}`;
+  const relative = path.join(relDir, filename).replace(/\\/g, "/");
+  const absDir = path.join(uploadRoot(), relDir);
+  await fs.mkdir(absDir, { recursive: true });
+  await fs.writeFile(path.join(absDir, filename), input.bytes);
+  const mime =
+    sniffed.ext === "png"
+      ? "image/png"
+      : sniffed.ext === "webp"
+        ? "image/webp"
+        : sniffed.ext === "webm"
+          ? "video/webm"
+          : sniffed.kind === "video"
+            ? "video/mp4"
+            : "image/jpeg";
+  try {
+    const inserted = db
+      .insert(messages)
+      .values({
+        conversationId: input.conversationId,
+        senderId: input.userId,
+        type: sniffed.kind === "video" ? "VIDEO" : "IMAGE",
+        body: null,
+        clientId: input.clientId,
+        createdAt: now,
+      })
+      .returning({ id: messages.id })
+      .get();
+    const attachment = db
+      .insert(messageAttachments)
+      .values({
+        messageId: inserted.id,
+        uploaderId: input.userId,
+        kind: sniffed.kind,
+        mime,
+        size: input.bytes.length,
+        path: relative,
+        status: "PROCESSING",
+        createdAt: now,
+      })
+      .returning({ id: messageAttachments.id })
+      .get();
+    db.insert(mediaJobs)
+      .values({ attachmentId: attachment.id, status: "PENDING", createdAt: now, updatedAt: now })
+      .run();
+    db.update(conversations)
+      .set({ lastMessageId: inserted.id, updatedAt: now })
+      .where(eq(conversations.id, input.conversationId))
+      .run();
+    const loaded = loadMessage(inserted.id);
+    if (!loaded) throw new ChatError("پیام ذخیره نشد");
+    return loaded;
+  } catch (error) {
+    if (isUniqueError(error)) {
+      const again = existingByClient(input.userId, input.clientId);
+      if (again) return again;
+    }
+    throw error;
+  }
 }

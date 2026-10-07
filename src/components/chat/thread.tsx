@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
-import { ArrowDown, ArrowRight } from "lucide-react";
+import { ArrowDown, ArrowRight, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -23,6 +23,7 @@ import {
 import { cn, toFaDigits } from "@/lib/utils";
 import { markChatReadAction, olderMessagesAction } from "@/server/actions/chat";
 import { loadOutbox, newClientId, removeOutbox, saveOutbox, type OutboxItem } from "./outbox";
+import { MediaPrepareError, prepareChatFile } from "@/lib/chat/prepare-media";
 import { chatSocket } from "./socket";
 import { useOnlineIds } from "./use-presence";
 
@@ -235,6 +236,7 @@ export function ChatThread({
       senderActive: true,
       type: "TEXT",
       body,
+      attachment: null,
       replyTo: reply
         ? {
             id: reply.id,
@@ -273,6 +275,27 @@ export function ChatThread({
     chatSocket().emit("typing", { conversationId, active: false });
     if (typingIdle.current) window.clearTimeout(typingIdle.current);
     queueSend(body);
+  }
+
+  async function onPickFile(file: File | undefined) {
+    if (!file) return;
+    try {
+      const prepared = await prepareChatFile(file);
+      const clientId = newClientId();
+      const body = new FormData();
+      body.set("file", prepared.file);
+      body.set("conversationId", String(conversationId));
+      body.set("clientId", clientId);
+      const response = await fetch("/api/chat/media", { method: "POST", body });
+      const payload = (await response.json()) as { message?: ChatMessage; error?: string };
+      if (!response.ok || !payload.message) {
+        throw new MediaPrepareError(payload.error || fa.chat.mediaFailed);
+      }
+      merge(payload.message);
+      router.refresh();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : fa.chat.mediaFailed);
+    }
   }
 
   function openMenu(message: ChatMessage, mobile: boolean) {
@@ -408,6 +431,29 @@ export function ChatThread({
                 {message.deletedAt ? (
                   <p className="italic">{fa.chat.deleted}</p>
                 ) : (
+                  <>
+                    {message.attachment?.status === "READY" && message.attachment.kind === "image" && message.attachment.url ? (
+                      <img
+                        src={message.attachment.url}
+                        alt={fa.chat.photo}
+                        className="mb-1 max-h-80 w-full rounded-md object-contain"
+                      />
+                    ) : null}
+                    {message.attachment?.status === "READY" && message.attachment.kind === "video" && message.attachment.url ? (
+                      <video
+                        src={message.attachment.url}
+                        poster={message.attachment.thumbUrl ?? undefined}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="mb-1 max-h-80 w-full rounded-md"
+                      />
+                    ) : null}
+                    {message.attachment && message.attachment.status !== "READY" ? (
+                      <p className="mb-1 text-xs">
+                        {message.attachment.status === "FAILED" ? fa.chat.mediaFailed : fa.chat.mediaProcessing}
+                      </p>
+                    ) : null}
                   <p className="whitespace-pre-wrap break-words">
                     {linkify(message.body ?? "").map((part, partIndex) =>
                       part.type === "link" ? (
@@ -425,6 +471,7 @@ export function ChatThread({
                       ),
                     )}
                   </p>
+                  </>
                 )}
                 <p className="mt-1 text-end text-[11px] opacity-80">
                   {message.localStatus === "sending"
@@ -526,6 +573,20 @@ export function ChatThread({
           </p>
         ) : null}
         <div className="flex items-end gap-2">
+          <label className="border-input inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md border md:size-10">
+            <ImagePlus className="size-5" />
+            <span className="sr-only">{fa.chat.attach}</span>
+            <input
+              type="file"
+              accept="image/*,video/*"
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                void onPickFile(file);
+              }}
+            />
+          </label>
           <textarea
             ref={area}
             value={draft}

@@ -17,7 +17,13 @@ export function ChatNotifier({ userId }: { userId: number }) {
       if (message.senderId === userId) return;
       if (pathname === `/chat/${message.conversationId}`) return;
       toast(message.senderName, {
-        description: message.body ?? fa.chat.deleted,
+        description:
+          message.body ??
+          (message.type === "IMAGE"
+            ? fa.chat.photo
+            : message.type === "VIDEO"
+              ? fa.chat.video
+              : fa.chat.deleted),
         action: {
           label: fa.chat.openChat,
           onClick: () => router.push(`/chat/${message.conversationId}`),

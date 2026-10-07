@@ -1,4 +1,15 @@
-import type { ConversationType, MessageType } from "@/db/schema";
+import type { AttachmentStatus, ConversationType, MessageType } from "@/db/schema";
+
+export type ChatAttachment = {
+  id: number;
+  kind: "image" | "video";
+  status: AttachmentStatus;
+  url: string | null;
+  thumbUrl: string | null;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+};
 
 export type ChatMessage = {
   id: number;
@@ -8,6 +19,7 @@ export type ChatMessage = {
   senderActive: boolean;
   type: MessageType;
   body: string | null;
+  attachment: ChatAttachment | null;
   replyTo: {
     id: number;
     body: string | null;
@@ -41,5 +53,8 @@ export type MemberReceipt = {
 };
 
 export const CHAT_BODY_MAX = 4000;
+export const CHAT_VIDEO_MAX_BYTES = 100 * 1024 * 1024;
+export const CHAT_VIDEO_MAX_MS = 5 * 60 * 1000;
+export const CHAT_IMAGE_MAX_BYTES = 12 * 1024 * 1024;
 export const CHAT_EDIT_WINDOW_MS = 15 * 60 * 1000;
 export const CHAT_PAGE_SIZE = 40;

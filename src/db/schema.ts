@@ -595,6 +595,29 @@ export const messageAttachments = sqliteTable(
   (t) => [index("message_attachments_status_idx").on(t.status)],
 );
 
+export const MEDIA_JOB_STATUSES = ["PENDING", "PROCESSING", "DONE", "FAILED"] as const;
+export type MediaJobStatus = (typeof MEDIA_JOB_STATUSES)[number];
+
+export const mediaJobs = sqliteTable(
+  "media_jobs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    attachmentId: integer("attachment_id")
+      .notNull()
+      .references(() => messageAttachments.id, { onDelete: "cascade" }),
+    status: text("status").$type<MediaJobStatus>().notNull().default("PENDING"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [index("media_jobs_status_idx").on(t.status)],
+);
+
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),

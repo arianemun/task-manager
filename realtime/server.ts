@@ -20,6 +20,7 @@ import {
   memberReceipts,
   sendTextMessage,
 } from "@/lib/chat/store";
+import { processNextMediaJob } from "@/lib/chat/media-worker";
 
 const sendSchema = z.object({
   conversationId: z.number().int().positive(),
@@ -337,6 +338,16 @@ export function startRealtimeServer(port: number): http.Server {
       }
     });
   });
+
+  const mediaTimer = setInterval(() => {
+    void processNextMediaJob()
+      .then((message) => {
+        if (!message) return;
+        io.to(`conversation:${message.conversationId}`).emit("message:updated", message);
+      })
+      .catch(() => undefined);
+  }, 2000);
+  httpServer.on("close", () => clearInterval(mediaTimer));
 
   httpServer.listen(port);
   return httpServer;

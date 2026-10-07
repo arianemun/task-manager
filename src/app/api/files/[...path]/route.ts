@@ -1,5 +1,7 @@
+import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
@@ -10,8 +12,10 @@ import {
   departmentIdsForUser,
   sharesDepartment,
 } from "@/lib/departments/membership";
+import { assertConversationMember } from "@/lib/chat/store";
 import { parseAttachmentPath } from "@/lib/uploads/attachment";
 import { resolveUploadPath } from "@/lib/uploads/avatar";
+import { parseByteRange } from "@/lib/uploads/range";
 
 type Params = { params: Promise<{ path: string[] }> };
 
@@ -21,6 +25,8 @@ const MIME: Record<string, string> = {
   ".png": "image/png",
   ".webp": "image/webp",
   ".pdf": "application/pdf",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
 };
 
 function canAccessFile(actor: AuthUser, relative: string): boolean {
@@ -34,6 +40,18 @@ function canAccessFile(actor: AuthUser, relative: string): boolean {
       return sharesDepartment(actor.departmentIds, departmentIdsForUser(ownerId));
     }
     return false;
+  }
+
+  if (relative.startsWith("chat/")) {
+    const parts = relative.split("/");
+    const conversationId = Number(parts[1]);
+    if (!Number.isInteger(conversationId) || parts.length !== 3) return false;
+    try {
+      assertConversationMember(conversationId, actor.id);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   if (relative.startsWith("attachments/")) {
@@ -59,7 +77,7 @@ function canAccessFile(actor: AuthUser, relative: string): boolean {
   return actor.role === "ADMIN";
 }
 
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   try {
     const actor = await requireUser({ allowMustChangePassword: true });
     const segments = (await params).path;
@@ -83,11 +101,30 @@ export async function GET(_req: Request, { params }: Params) {
       return NextResponse.json({ error: "مسیر نامعتبر" }, { status: 400 });
     }
 
-    const data = await fs.readFile(abs);
+    const stat = await fs.stat(abs);
     const ext = path.extname(abs).toLowerCase();
-    return new NextResponse(data, {
+    const type = MIME[ext] ?? "application/octet-stream";
+    const range = parseByteRange(request.headers.get("range"), stat.size);
+    if (request.headers.get("range") && !range) {
+      return new NextResponse(null, {
+        status: 416,
+        headers: { "Content-Range": `bytes */${stat.size}` },
+      });
+    }
+    const start = range?.start ?? 0;
+    const end = range?.end ?? stat.size - 1;
+    const stream = Readable.toWeb(
+      createReadStream(abs, { start, end }),
+    ) as ReadableStream;
+    return new NextResponse(stream, {
+      status: range ? 206 : 200,
       headers: {
-        "Content-Type": MIME[ext] ?? "application/octet-stream",
+        "Content-Type": type,
+        "Content-Length": String(end - start + 1),
+        "Accept-Ranges": "bytes",
+        ...(range
+          ? { "Content-Range": `bytes ${start}-${end}/${stat.size}` }
+          : {}),
         "Cache-Control": "private, max-age=3600",
       },
     });
