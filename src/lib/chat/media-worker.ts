@@ -1,30 +1,14 @@
-import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaJobs, messageAttachments } from "@/db/schema";
 import { resolveUploadPath } from "@/lib/uploads/avatar";
 import { loadMessage } from "./store";
+import { probeDurationMs, transcodeImageFile, transcodeVideoFile, writeThumbnail } from "./transcode";
 import { CHAT_VIDEO_MAX_MS, type ChatMessage } from "./types";
 
-const execFileAsync = promisify(execFile);
 let busy = false;
-
-async function probeDurationMs(file: string): Promise<number> {
-  const { stdout } = await execFileAsync("ffprobe", [
-    "-v",
-    "error",
-    "-show_entries",
-    "format=duration",
-    "-of",
-    "csv=p=0",
-    file,
-  ]);
-  const seconds = Number(String(stdout).trim());
-  return Number.isFinite(seconds) ? Math.round(seconds * 1000) : 0;
-}
 
 async function transcode(attachmentId: number): Promise<void> {
   const row = db
@@ -46,46 +30,11 @@ async function transcode(attachmentId: number): Promise<void> {
     if (durationMs > CHAT_VIDEO_MAX_MS) {
       throw new Error("ویدیو حداکثر ۵ دقیقه است");
     }
-    await execFileAsync("ffmpeg", [
-      "-y",
-      "-i",
-      input,
-      "-vf",
-      "scale='min(1280,iw)':-2",
-      "-c:v",
-      "libx264",
-      "-preset",
-      "veryfast",
-      "-crf",
-      "23",
-      "-c:a",
-      "aac",
-      "-movflags",
-      "+faststart",
-      output,
-    ]);
+    await transcodeVideoFile(input, output);
   } else {
-    await execFileAsync("ffmpeg", [
-      "-y",
-      "-i",
-      input,
-      "-vf",
-      "scale='min(1920,iw)':-2",
-      output,
-    ]);
+    await transcodeImageFile(input, output);
   }
-  await execFileAsync("ffmpeg", [
-    "-y",
-    "-ss",
-    "0.2",
-    "-i",
-    output,
-    "-frames:v",
-    "1",
-    "-vf",
-    "scale='min(480,iw)':-2",
-    thumb,
-  ]);
+  await writeThumbnail(output, thumb, row.kind === "video" ? { at: "0.2" } : undefined);
   const stat = await fs.stat(output);
   const relativeOut = path.posix.join(path.posix.dirname(row.path), outputName);
   const relativeThumb = path.posix.join(path.posix.dirname(row.path), thumbName);
