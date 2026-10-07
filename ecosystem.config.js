@@ -7,6 +7,7 @@ module.exports = {
       script: "server.js",
       instances: 1,
       exec_mode: "fork",
+      user: "www",
       env: {
         NODE_ENV: "production",
         TZ: "Asia/Tehran",
@@ -25,6 +26,7 @@ module.exports = {
       args: "realtime/server.ts",
       instances: 1,
       exec_mode: "fork",
+      user: "www",
       env: {
         NODE_ENV: "production",
         TZ: "Asia/Tehran",

@@ -70,6 +70,7 @@ export const fa = {
     calendar: "تقویم",
     myReport: "گزارش من",
     myInfo: "اطلاعات من",
+    announcementsAndInfo: "اطلاعیه‌ها و اطلاعات من",
     profile: "پروفایل",
     chat: "گفتگوها",
   },

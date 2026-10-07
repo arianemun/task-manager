@@ -146,6 +146,48 @@ describe("گفتگوی متنی", () => {
     ).toThrow(/غیرفعال/);
   });
 
+  it("احراز هویت سوکت: کوکی معتبر، نامعتبر، نسخه قدیمی و کاربر غیرفعال", async () => {
+    const { a, db, schema } = await seedPair();
+    const { createSessionToken } = await import("@/lib/auth/jwt");
+    const { startRealtimeServer } = await import("../../../realtime/server");
+    const server = startRealtimeServer(0);
+    await new Promise<void>((resolve) => server.once("listening", () => resolve()));
+    const port = (server.address() as AddressInfo).port;
+    const sockets: Socket[] = [];
+
+    function open(token: string) {
+      const socket = connect(port, token);
+      sockets.push(socket);
+      return socket;
+    }
+
+    function rejected(socket: Socket): Promise<void> {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("باید رد می‌شد")), 4000);
+        socket.on("connect", () => {
+          clearTimeout(timer);
+          reject(new Error("اتصال نباید برقرار شود"));
+        });
+        socket.on("connect_error", () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+    }
+
+    try {
+      const valid = open(await createSessionToken(a.id, 1));
+      await waitConnect(valid);
+      await rejected(open("not-a-jwt"));
+      await rejected(open(await createSessionToken(a.id, 0)));
+      db.update(schema.users).set({ isActive: false }).where(eq(schema.users.id, a.id)).run();
+      await rejected(open(await createSessionToken(a.id, 1)));
+    } finally {
+      for (const socket of sockets) socket.close();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
   it("سوکت پیام را به عضو دیگر می‌رساند و قطع داخلی سوکت را می‌بندد", async () => {
     const { a, b } = await seedPair();
     const store = await import("@/lib/chat/store");

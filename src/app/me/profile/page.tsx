@@ -15,6 +15,8 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUserOrRedirect } from "@/lib/auth/redirect";
 import { fa } from "@/lib/i18n/fa";
+import { getNavBadges } from "@/server/queries/nav-badges";
+import { toFaDigits } from "@/lib/utils";
 import { eq } from "drizzle-orm";
 
 export default async function MeProfilePage() {
@@ -22,6 +24,7 @@ export default async function MeProfilePage() {
     roles: ["STAFF", "ADMIN", "MANAGER"],
   });
   const full = db.select().from(users).where(eq(users.id, user.id)).get();
+  const unread = getNavBadges(user).unread;
 
   return (
     <Stack className="overflow-x-hidden">
@@ -54,8 +57,13 @@ export default async function MeProfilePage() {
           {full?.position ? (
             <Row label="سمت" value={full.position} />
           ) : null}
-          <Link href="/me/info" className="text-primary inline-flex min-h-11 items-center">
-            {fa.nav.myInfo}
+          <Link href="/me/info" className="text-primary inline-flex min-h-11 items-center gap-2">
+            {fa.nav.announcementsAndInfo}
+            {unread > 0 ? (
+              <span className="bg-destructive text-destructive-foreground inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold">
+                {toFaDigits(unread > 99 ? "99+" : unread)}
+              </span>
+            ) : null}
           </Link>
         </CardContent>
       </Card>

@@ -187,6 +187,7 @@ export const ME_NAV: NavItemConfig[] = [
     href: "/me/profile",
     label: fa.nav.profile,
     group: "me",
+    badge: "unread",
   },
 ];
 

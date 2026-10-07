@@ -108,6 +108,13 @@ export function startRealtimeServer(port: number): http.Server {
     req: http.IncomingMessage,
     res: http.ServerResponse,
   ): Promise<void> {
+    const path = (req.url ?? "").split("?")[0];
+    if (path === "/health" && req.method === "GET") {
+      res.statusCode = 200;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
     const secret = process.env.INTERNAL_SECRET;
     const header = req.headers.authorization;
     if (!secret || header !== `Bearer ${secret}`) {
