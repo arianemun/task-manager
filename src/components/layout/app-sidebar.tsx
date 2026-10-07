@@ -18,6 +18,7 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { AppCredit } from "@/components/layout/app-credit";
 import { filterNav, groupNav, type NavItemConfig } from "@/config/nav";
 import { navIcon } from "@/config/nav-icons";
 import type { AuthUser } from "@/lib/auth/user";
@@ -56,7 +57,7 @@ export function AppSidebar({
 }: Props) {
   const pathname = usePathname() || "/";
   const isMobile = useIsMobile();
-  const { setOpenMobile, isMobile: sidebarMobile } = useSidebar();
+  const { setOpenMobile, isMobile: sidebarMobile, state } = useSidebar();
   const visible = filterNav(user, items);
   const groups = groupNav(visible);
 
@@ -136,6 +137,7 @@ export function AppSidebar({
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        {sidebarMobile || state === "expanded" ? <AppCredit /> : null}
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

@@ -18,9 +18,9 @@ export function StaffBottomNav({ items, badges }: Props) {
   return (
     <nav
       data-bottom-nav
-      className="border-border bg-card/95 fixed inset-x-0 bottom-0 z-20 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden print:hidden"
+      className="border-border bg-card/95 fixed inset-x-0 bottom-0 z-20 flex h-(--bottom-chrome) flex-col border-t backdrop-blur md:hidden print:hidden"
     >
-      <ul className="grid grid-cols-5 gap-0.5 px-1 py-1.5">
+      <ul className="grid h-(--bottom-nav-h) grid-cols-5 gap-0.5 px-1">
         {shown.map((item) => {
           const Icon = navIcon(item.id);
           const active =

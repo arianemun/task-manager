@@ -112,7 +112,7 @@ export function PermissionsForm({
             {state.error}
           </p>
         ) : null}
-        <div className="bg-background/95 sticky bottom-0 z-10 border-t py-3 backdrop-blur md:static md:border-0 md:bg-transparent md:py-0 md:backdrop-blur-none">
+        <div className="bg-background/95 sticky-actions sticky z-10 border-t py-3 backdrop-blur md:static md:bottom-auto md:border-0 md:bg-transparent md:py-0 md:backdrop-blur-none">
           <Button type="submit" disabled={pending} className="min-h-11 w-full md:w-auto">
             ذخیره مجوزها
           </Button>

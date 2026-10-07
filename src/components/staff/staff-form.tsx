@@ -418,7 +418,7 @@ export function StaffForm({ mode, departments, actorRole, initial }: Props) {
             </p>
           ) : null}
 
-          <div className="bg-background/95 sticky bottom-0 z-10 flex gap-2 border-t py-3 backdrop-blur md:static md:border-0 md:bg-transparent md:py-0 md:backdrop-blur-none">
+          <div className="bg-background/95 sticky-actions sticky z-10 flex gap-2 border-t py-3 backdrop-blur md:static md:bottom-auto md:border-0 md:bg-transparent md:py-0 md:backdrop-blur-none">
             <Button type="submit" disabled={pending} className="min-h-11 flex-1 md:flex-none">
               {pending ? fa.common.loading : fa.common.save}
             </Button>

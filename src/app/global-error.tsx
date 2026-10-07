@@ -12,7 +12,7 @@ export default function GlobalError({
         style={{
           fontFamily: "Tahoma, sans-serif",
           display: "flex",
-          minHeight: "100vh",
+          minHeight: "100dvh",
           alignItems: "center",
           justifyContent: "center",
           padding: 24,

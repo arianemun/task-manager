@@ -63,6 +63,19 @@
 | line-height بدنه (Vazirmatn) | حداقل ۱٫۷ |
 | عناوین h1–h3 | ۱٫۳۵–۱٫۵ (کمی بازتر از قبل) |
 
+## لبه پایین موبایل
+
+safe area فقط یک‌بار و فقط در لایه‌ای که به لبه viewport چسبیده اعمال می‌شود. توکن‌ها در `globals.css`:
+
+| توکن | معنی |
+|---|---|
+| `--safe-bottom` | `env(safe-area-inset-bottom)` |
+| `--bottom-nav-h` | ارتفاع خود bottom nav، بدون safe area |
+| `--bottom-chrome` | `--bottom-nav-h + --safe-bottom` فقط روی صفحه‌ای که bottom nav دارد؛ وگرنه صفر |
+| `--keyboard-inset` | روی موبایل، وقتی کیبورد باز است؛ nav پنهان و safe area صفر می‌شود |
+
+روی دسکتاپ هر چهار مقدار صفر است. لایه‌های بالاتر `env()` را دوباره جمع نمی‌کنند.
+
 ## کامپوننت‌های چیدمان
 
 - `PageContainer` — padding و max-width صفحه

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { KeyboardChrome } from "@/components/layout/keyboard-chrome";
 import { PwaRegister } from "@/components/pwa-register";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -44,6 +45,7 @@ export const viewport: Viewport = {
   themeColor: "#fb620e",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -62,6 +64,7 @@ export default function RootLayout({
         >
           <TooltipProvider delayDuration={200}>
             {children}
+            <KeyboardChrome />
             <Toaster richColors position="top-center" dir="rtl" />
             <PwaRegister />
           </TooltipProvider>

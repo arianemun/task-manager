@@ -87,3 +87,16 @@
 - [x] `npm test` / `npm run lint` / `npm run build`
 - [x] Lighthouse موبایل — `docs/LIGHTHOUSE_F.md`
 - [x] FLJS — `docs/FLJS_COMPARE.md`
+
+---
+
+# فاصله پایین — موبایل و PWA (نسخه ۱.۲.۱)
+
+این موارد روی دستگاه واقعی هنوز اجرا نشده‌اند. در هر کدام: صفحه امروز، یک Drawer با فرم، فرم با دکمه sticky، و باز کردن کیبورد.
+
+- [ ] iPhone در Safari
+- [ ] iPhone به‌صورت PWA نصب‌شده
+- [ ] Android Chrome
+- [ ] Android PWA
+
+انتظار: bottom nav فقط یک‌بار safe area زیر آیکن‌ها دارد؛ Drawer و دکمه sticky روی nav یا زیر home indicator شناور نیستند؛ با کیبورد باز، nav پنهان است و دکمه sticky بالای کیبورد می‌ماند. روی دسکتاپ این فاصله‌ها صفر است.

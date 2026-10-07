@@ -91,7 +91,7 @@ function ResponsiveDialogContent({
   return (
     <DrawerContent
       className={cn(
-        "flex max-h-[92dvh] flex-col pb-[env(safe-area-inset-bottom)]",
+        "flex max-h-[92dvh] flex-col",
         className,
       )}
       {...props}

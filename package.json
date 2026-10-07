@@ -1,9 +1,11 @@
 {
   "name": "task-manager",
-  "version": "0.1.0",
+  "version": "1.2.0",
   "private": true,
   "scripts": {
+    "predev": "tsx scripts/changelog-json.ts",
     "dev": "next dev --turbopack",
+    "prebuild": "tsx scripts/changelog-json.ts",
     "build": "next build && node scripts/copy-standalone.mjs",
     "start": "next start",
     "lint": "eslint",
@@ -21,7 +23,9 @@
     "postinstall": "node scripts/ensure-data-dir.mjs",
     "cron:generate": "tsx scripts/cron-generate.ts",
     "cron:close": "tsx scripts/cron-close.ts",
+    "pretest": "tsx scripts/changelog-json.ts",
     "test": "vitest run",
+    "release": "tsx scripts/release.ts",
     "test:watch": "vitest",
     "build:standalone": "node scripts/copy-standalone.mjs"
   },

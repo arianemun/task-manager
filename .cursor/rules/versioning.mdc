@@ -1,0 +1,24 @@
+---
+description: با هر قابلیت یا رفع باگ، نسخه SemVer و CHANGELOG و tag به‌روز شود
+alwaysApply: true
+---
+
+# نسخه‌بندی
+
+منبع نسخه فقط `version` در `package.json` است.
+
+- قابلیت جدید: minor (`1.3.0`)
+- رفع باگ یا بهبود کوچک: patch (`1.3.1`)
+- تغییر ناسازگار یا migration بزرگ داده: major
+
+با هر قابلیت یا رفع باگ:
+
+1. توضیح فارسی را زیر `## [منتشرنشده]` در `CHANGELOG.md` بگذار.
+2. بعد از اتمام کار `npm run release -- patch|minor|major` را اجرا کن تا نسخه بالا برود، همان بخش با تاریخ شمسی منتقل شود، و tag annotated ساخته شود.
+3. tag را بعد از push بفرست. خود اسکریپت push نمی‌کند.
+
+```bash
+npm run release -- patch
+git push origin main
+git push origin v1.2.1
+```

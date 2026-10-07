@@ -103,7 +103,7 @@ export function JalaliDatePicker({
       ) : (
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>{trigger}</DrawerTrigger>
-          <DrawerContent className="h-auto pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <DrawerContent className="h-auto">
             <DrawerHeader className="px-4 py-2">
               <DrawerTitle>{label ?? "انتخاب تاریخ"}</DrawerTitle>
             </DrawerHeader>
@@ -231,7 +231,7 @@ export function JalaliDateRangePicker({
       ) : (
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>{trigger}</DrawerTrigger>
-          <DrawerContent className="h-auto max-h-[92dvh] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <DrawerContent className="h-auto max-h-[92dvh]">
             <DrawerHeader className="px-4 py-2">
               <DrawerTitle>{label ?? "انتخاب بازه"}</DrawerTitle>
             </DrawerHeader>
@@ -316,7 +316,7 @@ export function JalaliMultiDatePicker({
       ) : (
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerTrigger asChild>{trigger}</DrawerTrigger>
-          <DrawerContent className="h-auto pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <DrawerContent className="h-auto">
             <DrawerHeader className="px-4 py-2">
               <DrawerTitle>{label ?? "انتخاب تاریخ‌ها"}</DrawerTitle>
             </DrawerHeader>

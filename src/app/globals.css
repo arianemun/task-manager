@@ -57,6 +57,11 @@
 /* ─── Light: zinc/neutral + یک accent ─── */
 :root {
   --radius: 0.5rem;
+  /* safe area فقط یک‌بار، در لایه‌ای که به لبه صفحه چسبیده */
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --bottom-nav-h: 3.5rem;
+  --bottom-chrome: 0px;
+  --keyboard-inset: 0px;
 
   /* تایپوگرافی — حداکثر ۵ اندازه، ۳ وزن */
   --fs-xs: 0.75rem; /* ۱۲ */
@@ -320,6 +325,85 @@
       scroll-behavior: auto !important;
     }
   }
+}
+
+@keyframes heartbeat {
+  0%,
+  46%,
+  100% {
+    transform: scale(1);
+  }
+  12% {
+    transform: scale(1.18);
+  }
+  24% {
+    transform: scale(1);
+  }
+  36% {
+    transform: scale(1.12);
+  }
+}
+
+.heart-beat {
+  display: inline-block;
+  transform-origin: center;
+  animation: heartbeat 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heart-beat {
+    animation-duration: 2.4s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
+@media (max-width: 767px) {
+  [data-has-bottom-nav] {
+    --bottom-chrome: calc(var(--bottom-nav-h) + var(--safe-bottom));
+  }
+}
+
+@media (min-width: 768px) {
+  :root {
+    --safe-bottom: 0px;
+    --bottom-nav-h: 0px;
+    --bottom-chrome: 0px;
+    --keyboard-inset: 0px;
+  }
+}
+
+html[data-keyboard="open"] {
+  --safe-bottom: 0px;
+}
+
+html[data-keyboard="open"] [data-has-bottom-nav] {
+  --bottom-chrome: 0px;
+}
+
+html[data-keyboard="open"] [data-bottom-nav] {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .sticky-actions {
+    position: sticky;
+    bottom: calc(var(--bottom-chrome) + var(--keyboard-inset));
+    padding-bottom: max(var(--safe-bottom), 0.75rem);
+    z-index: 10;
+  }
+
+  [data-has-bottom-nav] .sticky-actions {
+    padding-bottom: 0.75rem;
+  }
+}
+
+[data-slot="drawer-footer"],
+[data-slot="sheet-footer"] {
+  padding-bottom: max(var(--safe-bottom), 0.75rem);
+}
+
+[data-vaul-drawer-direction="bottom"]:not(:has([data-slot="drawer-footer"])) {
+  padding-bottom: max(var(--safe-bottom), 0.75rem);
 }
 
 /* چاپ گزارش — A4، بدون پوسته، نمودار تمام‌عرض، تمایز B&W */

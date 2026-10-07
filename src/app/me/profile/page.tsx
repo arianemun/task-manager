@@ -1,3 +1,4 @@
+import { AppCredit } from "@/components/layout/app-credit";
 import { AvatarForm } from "@/components/me/avatar-form";
 import { ChangePasswordDialog } from "@/components/me/change-password-dialog";
 import { PageHeader } from "@/components/layout/page-header";
@@ -64,6 +65,8 @@ export default async function MeProfilePage() {
           <ChangePasswordDialog />
         </CardContent>
       </Card>
+
+      <AppCredit />
     </Stack>
   );
 }

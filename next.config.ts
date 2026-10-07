@@ -1,4 +1,21 @@
+import { execSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import type { NextConfig } from "next";
+
+const appVersion = (
+  JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as {
+    version: string;
+  }
+).version;
+
+function appCommit(): string {
+  try {
+    return execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim();
+  } catch {
+    return "unknown";
+  }
+}
 
 const securityHeaders = [
   {
@@ -35,6 +52,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  env: {
+    NEXT_PUBLIC_APP_VERSION: appVersion,
+    NEXT_PUBLIC_APP_COMMIT: appCommit(),
+  },
   serverExternalPackages: ["better-sqlite3"],
   async headers() {
     return [

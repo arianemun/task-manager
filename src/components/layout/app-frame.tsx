@@ -48,7 +48,10 @@ export async function AppFrame({
         hideOnMobile={staffMobile}
       />
 
-      <SidebarInset className="min-w-0">
+      <SidebarInset
+        className="min-w-0"
+        data-has-bottom-nav={staffMobile ? "" : undefined}
+      >
         <SiteHeader
           fullName={user.fullName}
           role={user.role}
@@ -58,7 +61,11 @@ export async function AppFrame({
 
         <PageContainer
           narrow={narrow}
-          className={staffMobile ? "pb-24 md:pb-6 lg:pb-8" : undefined}
+          className={
+            staffMobile
+              ? "pb-[calc(var(--bottom-chrome)+1rem)] md:pb-6 lg:pb-8"
+              : undefined
+          }
         >
           <div id="main-content">{children}</div>
         </PageContainer>

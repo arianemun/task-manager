@@ -113,6 +113,16 @@ export const fa = {
     dark: "تاریک",
     system: "سیستم",
   },
+
+  about: {
+    version: "نسخه",
+    changesTitle: "تغییرات این نسخه",
+    madeWith: "ساخته شده با عشق",
+    by: "توسط",
+    author: "آرین پزشکی",
+    authorUrl: "https://github.com/arianemun",
+    noChanges: "برای این نسخه توضیحی ثبت نشده است",
+  },
 } as const;
 
 export type FaDict = typeof fa;
