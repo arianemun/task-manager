@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, lt, or, sql, type SQL } from "drizzle-orm";
 import fs from "node:fs";
 import path from "node:path";
 import { db, type Db } from "@/db";
@@ -6,6 +6,7 @@ import {
   auditLogs,
   settings,
   taskAssignments,
+  mediaJobs,
   taskOccurrences,
   taskTemplates,
   userDepartments,
@@ -43,7 +44,8 @@ export type HealthCheckId =
   | "generate_stale"
   | "backup_stale"
   | "close_stale"
-  | "source_department";
+  | "source_department"
+  | "media_jobs";
 
 export type HealthFinding = {
   id: HealthCheckId;
@@ -576,6 +578,26 @@ function closeStale(database: Db) {
   );
 }
 
+const MEDIA_JOB_STUCK_MS = 60 * 60 * 1000;
+
+function mediaJobsAttention(database: Db) {
+  const cutoff = new Date(Date.now() - MEDIA_JOB_STUCK_MS);
+  const rows = database
+    .select({ id: mediaJobs.id })
+    .from(mediaJobs)
+    .where(
+      or(
+        eq(mediaJobs.status, "FAILED"),
+        and(eq(mediaJobs.status, "PROCESSING"), lt(mediaJobs.updatedAt, cutoff)),
+      ),
+    )
+    .all();
+  return {
+    count: rows.length,
+    sampleIds: rows.slice(0, SAMPLE_LIMIT).map((row) => row.id),
+  };
+}
+
 const RUNNERS: CheckRunner[] = [
   {
     id: "foreign_close",
@@ -632,6 +654,11 @@ const RUNNERS: CheckRunner[] = [
     title:
       "occurrence بدون source_department_id یا با دپارتمانی که کاربر در period_start عضوش نبوده",
     run: sourceDepartment,
+  },
+  {
+    id: "media_jobs",
+    title: "صف رسانه FAILED یا بیش از یک ساعت در PROCESSING",
+    run: mediaJobsAttention,
   },
 ];
 
