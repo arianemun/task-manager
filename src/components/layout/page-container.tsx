@@ -12,9 +12,10 @@ type Props = {
 export function PageContainer({ children, narrow = false, className }: Props) {
   return (
     <div
+      data-page-container
       className={cn(
         "mx-auto w-full flex-1",
-        "px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8",
+        "py-4 md:py-6 lg:py-8",
         narrow ? "max-w-4xl" : "max-w-6xl",
         className,
       )}

@@ -95,6 +95,7 @@
 این موارد روی دستگاه واقعی هنوز اجرا نشده‌اند. در هر کدام: صفحه امروز، یک Drawer با فرم، فرم با دکمه sticky، و باز کردن کیبورد.
 
 - [ ] iPhone در Safari
+- [ ] iPhone افقی (ناچ چپ یا راست؛ محتوا، هدر، Drawer و bottom nav زیر ناچ نروند)
 - [ ] iPhone به‌صورت PWA نصب‌شده
 - [ ] Android Chrome
 - [ ] Android PWA

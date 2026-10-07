@@ -27,7 +27,7 @@ export function SiteHeader({
   return (
     <header
       data-app-header
-      className="border-border bg-background/80 sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-md md:h-16 md:px-6 print:hidden"
+      className="border-border bg-background/80 sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b backdrop-blur-md md:h-16 print:hidden"
     >
       <SidebarTrigger
         className={cn(

@@ -57,8 +57,10 @@
 /* ─── Light: zinc/neutral + یک accent ─── */
 :root {
   --radius: 0.5rem;
-  /* safe area فقط یک‌بار، در لایه‌ای که به لبه صفحه چسبیده */
+  /* safe area فقط یک‌بار، در بیرونی‌ترین لایهٔ چسبیده به لبه */
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
   --bottom-nav-h: 3.5rem;
   --bottom-chrome: 0px;
   --keyboard-inset: 0px;
@@ -382,6 +384,37 @@ html[data-keyboard="open"] [data-has-bottom-nav] {
 
 html[data-keyboard="open"] [data-bottom-nav] {
   display: none;
+}
+
+[data-app-header] {
+  padding-left: max(1rem, var(--safe-left));
+  padding-right: max(1rem, var(--safe-right));
+}
+
+[data-page-container] {
+  padding-left: max(1rem, var(--safe-left));
+  padding-right: max(1rem, var(--safe-right));
+}
+
+[data-bottom-nav],
+[data-slot="drawer-content"] {
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
+@media (min-width: 768px) {
+  [data-app-header],
+  [data-page-container] {
+    padding-left: max(1.5rem, var(--safe-left));
+    padding-right: max(1.5rem, var(--safe-right));
+  }
+}
+
+@media (min-width: 1024px) {
+  [data-page-container] {
+    padding-left: max(2rem, var(--safe-left));
+    padding-right: max(2rem, var(--safe-right));
+  }
 }
 
 @media (max-width: 767px) {
