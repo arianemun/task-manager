@@ -117,8 +117,16 @@ function generateDepartmentTasks(userId: number, departmentIds: number[]) {
   }
 }
 
-function applyDepartmentMembership(userId: number, departmentIds: number[]) {
-  const { added, removed } = setUserDepartments(userId, departmentIds);
+function applyDepartmentMembership(
+  userId: number,
+  departmentIds: number[],
+  actorId: number,
+) {
+  const { added, removed } = setUserDepartments(
+    userId,
+    departmentIds,
+    actorId,
+  );
   for (const departmentId of removed) {
     removeDeptOnlyPendingOnTransfer({ userId, oldDepartmentId: departmentId });
   }
@@ -209,7 +217,7 @@ export async function createStaffAction(
       .returning({ id: users.id })
       .get();
 
-    setUserDepartments(row.id, departmentIds);
+    setUserDepartments(row.id, departmentIds, actor.id);
     generateDepartmentTasks(row.id, departmentIds);
 
     const perms: Permission[] =
@@ -317,7 +325,7 @@ export async function updateStaffAction(
       .where(eq(users.id, id))
       .run();
 
-    applyDepartmentMembership(id, departmentIds);
+    applyDepartmentMembership(id, departmentIds, actor.id);
 
     writeAuditLog({
       actorId: actor.id,

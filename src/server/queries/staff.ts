@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import type { AuthUser } from "@/lib/auth/user";
 import {
+  currentMembershipSql,
   departmentIdsForUser,
   userInDepartmentsSql,
 } from "@/lib/departments/membership";
@@ -82,6 +83,7 @@ export function listStaffForActor(
           from user_departments ud
           inner join departments d on d.id = ud.department_id
           where ud.user_id = ${users.id}
+            and ${currentMembershipSql("ud")}
         ),
         ${departments.name}
       )`,
@@ -174,6 +176,7 @@ export function listAllDepartments() {
           from user_departments
           inner join users on users.id = user_departments.user_id
           where user_departments.department_id = ${departments.id}
+            and ${currentMembershipSql("user_departments")}
             and users.deleted_at is null
           union
           select users.id as member_id

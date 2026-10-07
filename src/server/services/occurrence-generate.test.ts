@@ -839,4 +839,114 @@ describe("تولید occurrence — DB", () => {
     expect(moved?.sourceDepartmentId).toBe(deptB.id);
     expect(moved?.status).toBe("PENDING");
   });
+
+  it("فاصله بین خروج و پیوستن دوباره occurrence نمی‌سازد", async () => {
+    const dates = await loadDates();
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const bcrypt = await import("bcryptjs");
+    const { setUserDepartments } = await import("@/lib/departments/membership");
+    const { generateOccurrences } = await import("./occurrence-generate");
+    const hash = await bcrypt.hash("x", 4);
+
+    dates.setNowProvider(() => new Date("2026-09-01T10:00:00+03:30"));
+    const admin = db
+      .insert(schema.users)
+      .values({
+        username: `gap_a_${Date.now()}`,
+        passwordHash: hash,
+        role: "ADMIN",
+        fullName: "ا",
+        fullNameNormalized: "ا",
+        mustChangePassword: false,
+        isActive: true,
+      })
+      .returning()
+      .get();
+    const dept = db
+      .insert(schema.departments)
+      .values({ name: "فاصله", managerId: admin.id })
+      .returning()
+      .get();
+    const staff = db
+      .insert(schema.users)
+      .values({
+        username: `gap_s_${Date.now()}`,
+        passwordHash: hash,
+        role: "STAFF",
+        fullName: "پ",
+        fullNameNormalized: "پ",
+        hireDate: "2026-01-01",
+        mustChangePassword: false,
+        isActive: true,
+      })
+      .returning()
+      .get();
+    const template = db
+      .insert(schema.taskTemplates)
+      .values({
+        title: "روزانه",
+        recurrenceType: "DAILY",
+        recurrenceConfig: { interval: 1 },
+        startDate: "2026-09-01",
+        skipHolidays: false,
+        isActive: true,
+        createdBy: admin.id,
+      })
+      .returning()
+      .get();
+    db.insert(schema.taskAssignments)
+      .values({
+        templateId: template.id,
+        assigneeType: "DEPARTMENT",
+        departmentId: dept.id,
+        createdAt: new Date("2026-09-01T08:00:00+03:30"),
+      })
+      .run();
+
+    setUserDepartments(staff.id, [dept.id], admin.id);
+    dates.setNowProvider(() => new Date("2026-09-20T10:00:00+03:30"));
+    setUserDepartments(staff.id, [], admin.id);
+    dates.setNowProvider(() => new Date("2026-10-01T10:00:00+03:30"));
+    setUserDepartments(staff.id, [dept.id], admin.id);
+    dates.setNowProvider(() => new Date("2026-10-06T10:00:00+03:30"));
+
+    generateOccurrences({
+      templateId: template.id,
+      userId: staff.id,
+      from: "2026-09-01",
+      to: "2026-10-06",
+      skipCursorUpdate: true,
+    });
+
+    const rows = db
+      .select()
+      .from(schema.taskOccurrences)
+      .where(eq(schema.taskOccurrences.userId, staff.id))
+      .all();
+    expect(
+      rows.filter(
+        (row) =>
+          row.periodStart >= "2026-09-20" && row.periodStart < "2026-10-01",
+      ),
+    ).toHaveLength(0);
+    expect(rows.some((row) => row.periodStart < "2026-09-20")).toBe(true);
+    expect(rows.some((row) => row.periodStart >= "2026-10-01")).toBe(true);
+
+    const memberships = db
+      .select()
+      .from(schema.userDepartments)
+      .where(eq(schema.userDepartments.userId, staff.id))
+      .all();
+    expect(memberships).toHaveLength(2);
+    expect(memberships.filter((row) => row.leftAt == null)).toHaveLength(1);
+
+    const audits = db.select().from(schema.auditLogs).all();
+    expect(audits.filter((row) => row.action === "department.join")).toHaveLength(
+      2,
+    );
+    expect(audits.filter((row) => row.action === "department.leave")).toHaveLength(
+      1,
+    );
+  });
 });

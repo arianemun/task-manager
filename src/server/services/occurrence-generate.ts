@@ -20,9 +20,15 @@ import {
   todayTehran,
   type GDate,
 } from "@/lib/dates";
-import { activeMembersOfDepartment } from "@/lib/departments/membership";
 import {
-  earliestEligibleStart,
+  activeMembersOfDepartment,
+  closeDepartmentMembership,
+  openDepartmentMembership,
+  periodInsideMembership,
+  type MembershipInterval,
+} from "@/lib/departments/membership";
+import {
+  effectiveOccurrenceStart,
   getOccurrencesInRange,
   type RecurrenceConfig,
   type RecurrenceTemplateInput,
@@ -147,6 +153,7 @@ type DeptPath = {
   departmentId: number;
   assignDate: GDate;
   joinedAt: GDate | null;
+  intervals: MembershipInterval[];
 };
 
 type Assignee = {
@@ -157,12 +164,36 @@ type Assignee = {
   deptPaths: DeptPath[];
 };
 
+function membershipIntervals(): Map<string, MembershipInterval[]> {
+  const map = new Map<string, MembershipInterval[]>();
+  const rows = db
+    .select({
+      userId: userDepartments.userId,
+      departmentId: userDepartments.departmentId,
+      joinedAt: userDepartments.joinedAt,
+      leftAt: userDepartments.leftAt,
+    })
+    .from(userDepartments)
+    .all();
+  for (const row of rows) {
+    const key = `${row.userId}:${row.departmentId}`;
+    const list = map.get(key) ?? [];
+    list.push({
+      joinedAt: row.joinedAt as GDate,
+      leftAt: (row.leftAt as GDate | null) ?? null,
+    });
+    map.set(key, list);
+  }
+  return map;
+}
+
 function resolveAssignees(templateId: number): Assignee[] {
   const assignments = db
     .select()
     .from(taskAssignments)
     .where(eq(taskAssignments.templateId, templateId))
     .all();
+  const intervals = membershipIntervals();
 
   const map = new Map<number, Assignee>();
 
@@ -201,10 +232,27 @@ function resolveAssignees(templateId: number): Assignee[] {
       const members = activeMembersOfDepartment(a.departmentId);
       for (const member of members) {
         const entry = ensure(member.user.id, member.user);
+        const departmentId = a.departmentId;
+        const stored = intervals.get(`${member.user.id}:${departmentId}`);
+        const pathIntervals =
+          stored && stored.length > 0
+            ? stored
+            : [{ joinedAt: member.joinedAt, leftAt: null }];
+        const existing = entry.deptPaths.find(
+          (path) => path.departmentId === departmentId,
+        );
+        if (existing) {
+          existing.assignDate = minGDate(
+            existing.assignDate,
+            assignmentCreatedDate,
+          );
+          continue;
+        }
         entry.deptPaths.push({
-          departmentId: a.departmentId,
+          departmentId,
           assignDate: assignmentCreatedDate,
           joinedAt: member.joinedAt,
+          intervals: pathIntervals,
         });
       }
     }
@@ -213,36 +261,16 @@ function resolveAssignees(templateId: number): Assignee[] {
   return [...map.values()];
 }
 
-function assigneeEffectiveStart(
+function directEligibleStart(
   templateStart: GDate,
   assignee: Assignee,
-): GDate {
-  const paths: Array<{
-    templateStart: GDate;
-    assignmentCreatedDate: GDate;
-    hireDate?: GDate | null;
-    departmentJoinedAt?: GDate | null;
-  }> = [];
-
-  if (assignee.userAssignDate) {
-    paths.push({
-      templateStart,
-      assignmentCreatedDate: assignee.userAssignDate,
-      hireDate: assignee.hireDate,
-    });
-  }
-  for (const path of assignee.deptPaths) {
-    paths.push({
-      templateStart,
-      assignmentCreatedDate: path.assignDate,
-      hireDate: assignee.hireDate,
-      departmentJoinedAt: path.joinedAt,
-    });
-  }
-  if (paths.length === 0) {
-    return templateStart;
-  }
-  return earliestEligibleStart(paths);
+): GDate | null {
+  if (!assignee.userAssignDate) return null;
+  return effectiveOccurrenceStart({
+    templateStart,
+    assignmentCreatedDate: assignee.userAssignDate,
+    hireDate: assignee.hireDate,
+  });
 }
 
 function templateInput(
@@ -276,27 +304,24 @@ function buildInsertsForUser(
   holidaySet: Set<GDate>,
   leaves: Array<{ start: GDate; end: GDate }> | undefined,
 ): InsertRow[] {
-  const effective = assigneeEffectiveStart(template.startDate, assignee);
-  const from = maxGDate(effective, rangeFrom);
+  const directStart = directEligibleStart(template.startDate, assignee);
+  const floors: GDate[] = [];
+  if (directStart) floors.push(directStart);
+  for (const path of assignee.deptPaths) {
+    for (const interval of path.intervals) {
+      floors.push(
+        effectiveOccurrenceStart({
+          templateStart: template.startDate,
+          assignmentCreatedDate: path.assignDate,
+          hireDate: assignee.hireDate,
+          departmentJoinedAt: interval.joinedAt,
+        }),
+      );
+    }
+  }
+  if (floors.length === 0) return [];
+  const from = maxGDate(minGDate(...floors), rangeFrom);
   if (compareGDate(from, rangeTo) > 0) return [];
-
-  const sourceDepartmentId = resolveOccurrenceSource({
-    paths: [
-      ...(assignee.userAssignDate
-        ? [{ kind: "direct" as const }]
-        : []),
-      ...assignee.deptPaths.map((path) => ({
-        kind: "department" as const,
-        departmentId: path.departmentId,
-      })),
-    ],
-    primaryDepartmentId: assignee.primaryDepartmentId,
-    memberships: assignee.deptPaths.map((path) => ({
-      departmentId: path.departmentId,
-      joinedAt: path.joinedAt,
-    })),
-  });
-  if (sourceDepartmentId == null) return [];
 
   const periods = getOccurrencesInRange(
     templateInput(template),
@@ -305,18 +330,59 @@ function buildInsertsForUser(
     { holidays: holidaySet },
   );
 
-  return periods.map((p) => ({
-    templateId: template.id,
-    userId: assignee.userId,
-    periodKey: p.periodKey,
-    periodStart: p.periodStart,
-    periodEnd: p.periodEnd,
-    dueAt: new Date(dueAtTehranMs(p.periodEnd, template.dueTime)),
-    status: isOnLeave(leaves, p.periodStart, p.periodEnd)
-      ? ("EXCUSED" as const)
-      : ("PENDING" as const),
-    sourceDepartmentId,
-  }));
+  const rows: InsertRow[] = [];
+  for (const period of periods) {
+    const directOk =
+      directStart != null &&
+      compareGDate(period.periodStart, directStart) >= 0;
+    const departmentPaths = assignee.deptPaths.flatMap((path) => {
+      const interval = path.intervals.find((item) =>
+        periodInsideMembership(period.periodStart, item),
+      );
+      if (!interval) return [];
+      const start = effectiveOccurrenceStart({
+        templateStart: template.startDate,
+        assignmentCreatedDate: path.assignDate,
+        hireDate: assignee.hireDate,
+        departmentJoinedAt: interval.joinedAt,
+      });
+      if (compareGDate(period.periodStart, start) < 0) return [];
+      return [
+        {
+          departmentId: path.departmentId,
+          joinedAt: interval.joinedAt,
+        },
+      ];
+    });
+    if (!directOk && departmentPaths.length === 0) continue;
+
+    const sourceDepartmentId = resolveOccurrenceSource({
+      paths: [
+        ...(directOk ? [{ kind: "direct" as const }] : []),
+        ...departmentPaths.map((path) => ({
+          kind: "department" as const,
+          departmentId: path.departmentId,
+        })),
+      ],
+      primaryDepartmentId: assignee.primaryDepartmentId,
+      memberships: departmentPaths,
+    });
+    if (sourceDepartmentId == null) continue;
+
+    rows.push({
+      templateId: template.id,
+      userId: assignee.userId,
+      periodKey: period.periodKey,
+      periodStart: period.periodStart,
+      periodEnd: period.periodEnd,
+      dueAt: new Date(dueAtTehranMs(period.periodEnd, template.dueTime)),
+      status: isOnLeave(leaves, period.periodStart, period.periodEnd)
+        ? ("EXCUSED" as const)
+        : ("PENDING" as const),
+      sourceDepartmentId,
+    });
+  }
+  return rows;
 }
 
 function insertBatch(rows: InsertRow[]): number {
@@ -558,6 +624,20 @@ export function onUserDepartmentChanged(input: {
   newDepartmentId: number | null;
 }): { removed: number; generated: number } {
   const today = todayTehran();
+  const person = db
+    .select({
+      departmentJoinedAt: users.departmentJoinedAt,
+    })
+    .from(users)
+    .where(eq(users.id, input.userId))
+    .get();
+  const membershipCount =
+    db
+      .select({ id: userDepartments.id })
+      .from(userDepartments)
+      .where(eq(userDepartments.userId, input.userId))
+      .all().length;
+
   db.update(users)
     .set({
       departmentJoinedAt: input.newDepartmentId ? today : null,
@@ -567,24 +647,22 @@ export function onUserDepartmentChanged(input: {
     .run();
 
   if (input.oldDepartmentId != null) {
-    db.delete(userDepartments)
-      .where(
-        and(
-          eq(userDepartments.userId, input.userId),
-          eq(userDepartments.departmentId, input.oldDepartmentId),
-        ),
-      )
-      .run();
+    closeDepartmentMembership({
+      userId: input.userId,
+      departmentId: input.oldDepartmentId,
+      leftAt: today,
+      legacyJoinedAt:
+        membershipCount === 0
+          ? ((person?.departmentJoinedAt ?? today) as GDate)
+          : null,
+    });
   }
   if (input.newDepartmentId != null) {
-    db.insert(userDepartments)
-      .values({
-        userId: input.userId,
-        departmentId: input.newDepartmentId,
-        joinedAt: today,
-      })
-      .onConflictDoNothing()
-      .run();
+    openDepartmentMembership({
+      userId: input.userId,
+      departmentId: input.newDepartmentId,
+      joinedAt: today,
+    });
   }
 
   let removed = 0;

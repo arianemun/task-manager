@@ -569,4 +569,74 @@ describe("بررسی سلامت داده", () => {
     expect(found.count).toBe(2);
     expect(found.sampleIds).toEqual([missing.id, late.id]);
   });
+
+  it("خروج از دپارتمان occurrence گذشته را ناسالم نمی‌کند", () => {
+    const { admin, dept, staff } = seedPeople();
+    db.insert(schema.userDepartments)
+      .values({
+        userId: staff.id,
+        departmentId: dept.id,
+        joinedAt: "2026-06-01",
+        leftAt: "2026-10-01",
+      })
+      .run();
+    const template = seedTemplate(admin.id);
+    occ({
+      templateId: template.id,
+      userId: staff.id,
+      period: "2026-09-15",
+      sourceDepartmentId: dept.id,
+    });
+    expect(finding("source_department").count).toBe(0);
+
+    const afterLeave = occ({
+      templateId: template.id,
+      userId: staff.id,
+      period: "2026-10-03",
+      sourceDepartmentId: dept.id,
+    });
+    const found = finding("source_department");
+    expect(found.count).toBe(1);
+    expect(found.sampleIds).toEqual([afterLeave.id]);
+  });
+
+  it("عضویت باز تکراری رد می‌شود", () => {
+    const { dept, staff } = seedPeople();
+    db.insert(schema.userDepartments)
+      .values({
+        userId: staff.id,
+        departmentId: dept.id,
+        joinedAt: "2026-01-01",
+      })
+      .run();
+    expect(() =>
+      db
+        .insert(schema.userDepartments)
+        .values({
+          userId: staff.id,
+          departmentId: dept.id,
+          joinedAt: "2026-02-01",
+        })
+        .run(),
+    ).toThrow();
+
+    db.update(schema.userDepartments)
+      .set({ leftAt: "2026-03-01" })
+      .where(eq(schema.userDepartments.userId, staff.id))
+      .run();
+    db.insert(schema.userDepartments)
+      .values({
+        userId: staff.id,
+        departmentId: dept.id,
+        joinedAt: "2026-04-01",
+      })
+      .run();
+    const rows = db
+      .select()
+      .from(schema.userDepartments)
+      .where(eq(schema.userDepartments.userId, staff.id))
+      .all();
+    expect(rows).toHaveLength(2);
+    expect(rows.filter((row) => row.leftAt == null)).toHaveLength(1);
+  });
 });

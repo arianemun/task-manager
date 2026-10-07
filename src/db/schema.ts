@@ -129,6 +129,7 @@ export const users = sqliteTable(
 export const userDepartments = sqliteTable(
   "user_departments",
   {
+    id: integer("id").primaryKey({ autoIncrement: true }),
     userId: integer("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -136,10 +137,15 @@ export const userDepartments = sqliteTable(
       .notNull()
       .references(() => departments.id, { onDelete: "cascade" }),
     joinedAt: text("joined_at").notNull(),
+    /** خروج از دپارتمان. تهی یعنی عضویت باز است. */
+    leftAt: text("left_at"),
   },
   (t) => [
-    primaryKey({ columns: [t.userId, t.departmentId] }),
     index("user_departments_department_idx").on(t.departmentId),
+    index("user_departments_user_idx").on(t.userId),
+    uniqueIndex("user_departments_open_unique")
+      .on(t.userId, t.departmentId)
+      .where(sql`${t.leftAt} is null`),
   ],
 );
 

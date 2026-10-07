@@ -1,4 +1,5 @@
-import { compareGDate, type GDate } from "@/lib/dates";
+import type { GDate } from "@/lib/dates";
+import { periodInsideMembership } from "@/lib/departments/intervals";
 import {
   resolveOccurrenceSource,
   type OccurrenceSourcePath,
@@ -12,6 +13,7 @@ export type SourceBackfillAssignment = {
 export type SourceBackfillMembership = {
   departmentId: number;
   joinedAt: GDate | null;
+  leftAt?: GDate | null;
 };
 
 export type SourceBackfillVerdict = {
@@ -29,10 +31,14 @@ function memberAt(
   departmentId: number,
   periodStart: GDate,
 ): boolean {
-  const row = memberships.find((item) => item.departmentId === departmentId);
-  if (!row) return false;
-  if (!row.joinedAt) return true;
-  return compareGDate(row.joinedAt, periodStart) <= 0;
+  return memberships.some(
+    (item) =>
+      item.departmentId === departmentId &&
+      periodInsideMembership(periodStart, {
+        joinedAt: item.joinedAt,
+        leftAt: item.leftAt ?? null,
+      }),
+  );
 }
 
 /**

@@ -92,6 +92,13 @@
       "when": 1791324621128,
       "tag": "0012_source_department_not_null",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1791357456610,
+      "tag": "0013_membership_history",
+      "breakpoints": true
     }
   ]
 }

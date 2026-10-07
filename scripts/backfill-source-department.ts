@@ -63,6 +63,7 @@ const membershipRows = db
     userId: userDepartments.userId,
     departmentId: userDepartments.departmentId,
     joinedAt: userDepartments.joinedAt,
+    leftAt: userDepartments.leftAt,
   })
   .from(userDepartments)
   .all();
@@ -90,6 +91,7 @@ for (const row of membershipRows) {
   list.push({
     departmentId: row.departmentId,
     joinedAt: row.joinedAt as GDate,
+    leftAt: (row.leftAt as GDate | null) ?? null,
   });
   membershipsByUser.set(row.userId, list);
 }

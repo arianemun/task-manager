@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { departments, userDepartments, users } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
+import { currentMembershipSql } from "@/lib/departments/membership";
 import { isAuthError } from "@/lib/auth/errors";
 import { requirePermission, requireUser } from "@/lib/auth/user";
 import { normalizePersianText } from "@/lib/validation/normalize";
@@ -117,7 +118,13 @@ export async function deleteDepartmentAction(
       .select({ c: count() })
       .from(userDepartments)
       .innerJoin(users, eq(users.id, userDepartments.userId))
-      .where(and(eq(userDepartments.departmentId, id), isNull(users.deletedAt)))
+      .where(
+        and(
+          eq(userDepartments.departmentId, id),
+          currentMembershipSql(),
+          isNull(users.deletedAt),
+        ),
+      )
       .get();
     const legacy = db
       .select({ c: count() })

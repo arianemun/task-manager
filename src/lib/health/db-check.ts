@@ -18,6 +18,7 @@ import {
   todayTehran,
   type GDate,
 } from "@/lib/dates";
+import { wasMemberAtPeriodSql } from "@/lib/departments/membership";
 import { earliestEligibleStart } from "@/lib/recurrence";
 import {
   DATA_HEALTH_LAST_RUN_KEY,
@@ -332,10 +333,13 @@ function earlyPeriod(database: Db) {
     for (const assignment of deptAssigns.get(row.templateId) ?? []) {
       let joinedAt: GDate | null | undefined;
       if (linked && linked.length > 0) {
-        joinedAt = linked.find(
-          (item) => item.departmentId === assignment.departmentId,
-        )?.joinedAt;
-        if (!joinedAt) continue;
+        const joined = linked
+          .filter((item) => item.departmentId === assignment.departmentId)
+          .map((item) => item.joinedAt);
+        if (joined.length === 0) continue;
+        joinedAt = joined.reduce((min, value) =>
+          compareGDate(value, min) < 0 ? value : min,
+        );
       } else if (person.departmentId === assignment.departmentId) {
         joinedAt = person.departmentJoinedAt;
       } else {
@@ -528,9 +532,9 @@ function backupStale(backupDir?: string) {
 
 /**
  * بررسی ۱۲ — منبع دپارتمان.
- * عضویت فعلی است: ردیف user_departments با joined_at <= period_start،
- * یا در نبود هر ردیف عضویت، ستون قدیمی users.department_id.
- * نبودن ردیف عضویت بعد از خروج از دپارتمان هم «عضو نبودن» حساب می‌شود.
+ * period_start باید داخل یکی از بازه‌های [joined_at, left_at) همان
+ * دپارتمان باشد. اگر کاربر هیچ ردیف عضویت ندارد، ستون قدیمی
+ * users.department_id ملاک است.
  */
 function sourceDepartment(database: Db) {
   return counted(
@@ -538,12 +542,11 @@ function sourceDepartment(database: Db) {
     sql`(
       ${taskOccurrences.sourceDepartmentId} IS NULL
       OR NOT (
-        EXISTS (
-          SELECT 1 FROM user_departments AS ud
-          WHERE ud.user_id = ${taskOccurrences.userId}
-            AND ud.department_id = ${taskOccurrences.sourceDepartmentId}
-            AND ud.joined_at <= ${taskOccurrences.periodStart}
-        )
+        ${wasMemberAtPeriodSql({
+          userId: taskOccurrences.userId,
+          departmentId: taskOccurrences.sourceDepartmentId,
+          periodStart: taskOccurrences.periodStart,
+        })}
         OR (
           NOT EXISTS (
             SELECT 1 FROM user_departments AS ud
