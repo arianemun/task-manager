@@ -5,6 +5,7 @@ import {
   getConversationForUser,
   listMessages,
   markRead,
+  memberReceipts,
 } from "@/lib/chat/store";
 
 export default async function ChatThreadPage({
@@ -32,7 +33,9 @@ export default async function ChatThreadPage({
       conversationId={conversationId}
       meId={user.id}
       title={conversation.title}
+      peerId={conversation.peerId}
       initial={messages}
+      initialReceipts={memberReceipts(conversationId)}
       lastReadMessageId={conversation.lastReadMessageId}
     />
   );

@@ -31,6 +31,13 @@ export type ConversationSummary = {
   unread: number;
   pinned: boolean;
   lastReadMessageId: number | null;
+  peerId: number | null;
+};
+
+export type MemberReceipt = {
+  userId: number;
+  deliveredId: number;
+  readId: number;
 };
 
 export const CHAT_BODY_MAX = 4000;

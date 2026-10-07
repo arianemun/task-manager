@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
+import { ChatNotifier } from "@/components/chat/chat-notifier";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { PageContainer } from "@/components/layout/page-container";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -55,6 +56,8 @@ export async function AppFrame({
         className="min-w-0"
         data-has-bottom-nav={staffMobile ? "" : undefined}
       >
+        <ChatNotifier userId={user.id} />
+
         <SiteHeader
           fullName={user.fullName}
           role={user.role}

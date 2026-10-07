@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import type { AddressInfo } from "node:net";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { io, type Socket } from "socket.io-client";
 
@@ -188,6 +188,44 @@ describe("گفتگوی متنی", () => {
     }
   });
 
+  it("قطع سوکت بلافاصله آفلاین نیست و بعد از مهلت آفلاین می‌شود", async () => {
+    process.env.PRESENCE_OFFLINE_MS = "200";
+    const { a, b } = await seedPair();
+    const store = await import("@/lib/chat/store");
+    const { createSessionToken } = await import("@/lib/auth/jwt");
+    const { startRealtimeServer } = await import("../../../realtime/server");
+    store.createDirectConversation(a.id, b.id);
+    const server = startRealtimeServer(0);
+    await new Promise<void>((resolve) => server.once("listening", () => resolve()));
+    const port = (server.address() as AddressInfo).port;
+    const clientA = connect(port, await createSessionToken(a.id, 1));
+    const clientB = connect(port, await createSessionToken(b.id, 1));
+    const offline = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("offline timeout")), 4000);
+      clientB.on("presence", (event: { userId: number; online: boolean }) => {
+        if (event.userId === a.id && event.online === false) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+    });
+    try {
+      await Promise.all([waitConnect(clientA), waitConnect(clientB)]);
+      clientA.disconnect();
+      const early = await Promise.race([
+        offline.then(() => "offline"),
+        new Promise((resolve) => setTimeout(() => resolve("still"), 80)),
+      ]);
+      expect(early).toBe("still");
+      await offline;
+    } finally {
+      delete process.env.PRESENCE_OFFLINE_MS;
+      clientA.close();
+      clientB.close();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
   it("سوکت پیام را به عضو دیگر می‌رساند و قطع داخلی سوکت را می‌بندد", async () => {
     const { a, b } = await seedPair();
     const store = await import("@/lib/chat/store");
@@ -220,6 +258,19 @@ describe("گفتگوی متنی", () => {
       });
       expect(ack.ok).toBe(true);
       expect(await received).toBeGreaterThan(0);
+      const { db } = await import("@/db");
+      const schema = await import("@/db/schema");
+      const delivered = db
+        .select({ id: schema.conversationMembers.lastDeliveredMessageId })
+        .from(schema.conversationMembers)
+        .where(
+          and(
+            eq(schema.conversationMembers.conversationId, id),
+            eq(schema.conversationMembers.userId, b.id),
+          ),
+        )
+        .get();
+      expect(delivered?.id ?? 0).toBeGreaterThan(0);
 
       const closed = new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error("disconnect timeout")), 4000);

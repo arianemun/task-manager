@@ -9,6 +9,7 @@ import type { ConversationSummary } from "@/lib/chat/types";
 import { normalizePersianText } from "@/lib/validation/normalize";
 import { cn, toFaDigits } from "@/lib/utils";
 import { NewChatButton, type ChatPerson, type ChatDept } from "./new-chat";
+import { useOnlineIds } from "./use-presence";
 
 export function ConversationList({
   items,
@@ -24,6 +25,7 @@ export function ConversationList({
   isAdmin: boolean;
 }) {
   const pathname = usePathname() || "";
+  const online = useOnlineIds();
   const [q, setQ] = useState("");
   const filtered = useMemo(() => {
     const needle = normalizePersianText(q);
@@ -69,8 +71,14 @@ export function ConversationList({
                     active && "bg-accent",
                   )}
                 >
-                  <span className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-full text-sm">
+                  <span className="bg-muted relative flex size-10 shrink-0 items-center justify-center rounded-full text-sm">
                     {item.title.slice(0, 1)}
+                    {item.peerId != null && online.includes(item.peerId) ? (
+                      <span
+                        className="absolute end-0 bottom-0 size-2.5 rounded-full bg-emerald-500"
+                        title={fa.chat.online}
+                      />
+                    ) : null}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline justify-between gap-2">

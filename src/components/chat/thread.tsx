@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { ArrowDown, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,27 +15,46 @@ import {
 import { fa } from "@/lib/i18n/fa";
 import { linkify } from "@/lib/chat/linkify";
 import { chatClock, chatDayLabel } from "@/lib/chat/time";
-import { CHAT_EDIT_WINDOW_MS, type ChatMessage } from "@/lib/chat/types";
+import {
+  CHAT_EDIT_WINDOW_MS,
+  type ChatMessage,
+  type MemberReceipt,
+} from "@/lib/chat/types";
 import { cn, toFaDigits } from "@/lib/utils";
 import { markChatReadAction, olderMessagesAction } from "@/server/actions/chat";
 import { loadOutbox, newClientId, removeOutbox, saveOutbox, type OutboxItem } from "./outbox";
 import { chatSocket } from "./socket";
+import { useOnlineIds } from "./use-presence";
 
 type Row = ChatMessage & { localStatus?: "sending" | "failed" };
 
 const START_INDEX = 100_000;
 
+function tickMark(messageId: number, meId: number, receipts: MemberReceipt[]) {
+  const others = receipts.filter((row) => row.userId !== meId);
+  if (others.length === 0) return { text: "✓", title: fa.chat.saved, read: false };
+  const delivered = others.every((row) => row.deliveredId >= messageId);
+  const read = others.every((row) => row.readId >= messageId);
+  if (read) return { text: "✓✓", title: fa.chat.read, read: true };
+  if (delivered) return { text: "✓✓", title: fa.chat.delivered, read: false };
+  return { text: "✓", title: fa.chat.saved, read: false };
+}
+
 export function ChatThread({
   conversationId,
   meId,
   title,
+  peerId,
   initial,
+  initialReceipts,
   lastReadMessageId,
 }: {
   conversationId: number;
   meId: number;
   title: string;
+  peerId: number | null;
   initial: ChatMessage[];
+  initialReceipts: MemberReceipt[];
   lastReadMessageId: number | null;
 }) {
   const [rows, setRows] = useState<Row[]>(initial);
@@ -47,6 +67,12 @@ export function ChatThread({
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   const [menu, setMenu] = useState<ChatMessage | null>(null);
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [receipts, setReceipts] = useState(initialReceipts);
+  const [typingName, setTypingName] = useState<string | null>(null);
+  const online = useOnlineIds();
+  const typingIdle = useRef<number | null>(null);
+  const markedRef = useRef(lastReadMessageId ?? 0);
+  const router = useRouter();
   const virtuoso = useRef<VirtuosoHandle>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const loadingOlder = useRef(false);
@@ -124,8 +150,22 @@ export function ChatThread({
     const onUpdated = (message: ChatMessage) => {
       if (message.conversationId === conversationId) merge(message);
     };
+    const onReceipt = (event: { conversationId: number; members: MemberReceipt[] }) => {
+      if (event.conversationId === conversationId) setReceipts(event.members);
+    };
+    const onTyping = (event: {
+      conversationId: number;
+      userId: number;
+      name: string;
+      active: boolean;
+    }) => {
+      if (event.conversationId !== conversationId || event.userId === meId) return;
+      setTypingName(event.active ? event.name : null);
+    };
     socket.on("message:new", onNew);
     socket.on("message:updated", onUpdated);
+    socket.on("receipt", onReceipt);
+    socket.on("typing", onTyping);
     const flush = () => {
       void loadOutbox(conversationId).then((items) => {
         for (const item of items.sort((a, b) => a.createdAt - b.createdAt)) {
@@ -138,6 +178,8 @@ export function ChatThread({
     return () => {
       socket.off("message:new", onNew);
       socket.off("message:updated", onUpdated);
+      socket.off("receipt", onReceipt);
+      socket.off("typing", onTyping);
       socket.off("connect", flush);
     };
     // فقط با عوض شدن گفتگو دوباره وصل شود
@@ -146,8 +188,12 @@ export function ChatThread({
 
   useEffect(() => {
     const last = rows.at(-1);
-    if (last && last.id > 0 && atBottom) void markChatReadAction(conversationId, last.id);
-  }, [rows, atBottom, conversationId]);
+    if (last && last.id > markedRef.current && atBottom) {
+      markedRef.current = last.id;
+      void markChatReadAction(conversationId, last.id).then(() => router.refresh());
+      chatSocket().emit("receipt:read", { conversationId, messageId: last.id });
+    }
+  }, [rows, atBottom, conversationId, router]);
 
   useEffect(() => {
     if (lastReadMessageId == null) return;
@@ -224,6 +270,8 @@ export function ChatThread({
       setDraft("");
       return;
     }
+    chatSocket().emit("typing", { conversationId, active: false });
+    if (typingIdle.current) window.clearTimeout(typingIdle.current);
     queueSend(body);
   }
 
@@ -287,7 +335,14 @@ export function ChatThread({
         <Link href="/chat" className="md:hidden" aria-label={fa.chat.back}>
           <ArrowRight className="size-5" />
         </Link>
-        <h2 className="truncate font-semibold">{title}</h2>
+        <h2 className="min-w-0 truncate font-semibold">
+          {title}
+          {peerId != null ? (
+            <span className="text-muted-foreground ms-2 text-xs font-normal">
+              {online.includes(peerId) ? fa.chat.online : fa.chat.away}
+            </span>
+          ) : null}
+        </h2>
       </div>
       <Virtuoso
         ref={virtuoso}
@@ -378,6 +433,16 @@ export function ChatThread({
                       ? ""
                       : chatClock(message.createdAt)}
                   {message.editedAt ? ` · ${fa.chat.edited}` : ""}
+                  {message.senderId === meId && message.id > 0
+                    ? (() => {
+                        const tick = tickMark(message.id, meId, receipts);
+                        return (
+                          <span className={cn("ms-1", tick.read && "text-sky-200")} title={tick.title}>
+                            {tick.text}
+                          </span>
+                        );
+                      })()
+                    : null}
                 </p>
                 {message.localStatus === "failed" ? (
                   <button
@@ -439,6 +504,11 @@ export function ChatThread({
           onSubmit();
         }}
       >
+        {typingName ? (
+          <p className="text-muted-foreground mb-1 text-xs">
+            {`${typingName} ${fa.chat.typing}`}
+          </p>
+        ) : null}
         {reply || editing ? (
           <p className="text-muted-foreground mb-2 flex items-center justify-between text-xs">
             <span className="truncate">
@@ -466,6 +536,11 @@ export function ChatThread({
               setDraft(event.target.value);
               event.target.style.height = "auto";
               event.target.style.height = `${Math.min(event.target.scrollHeight, 144)}px`;
+              chatSocket().emit("typing", { conversationId, active: true });
+              if (typingIdle.current) window.clearTimeout(typingIdle.current);
+              typingIdle.current = window.setTimeout(() => {
+                chatSocket().emit("typing", { conversationId, active: false });
+              }, 3000);
             }}
             onKeyDown={(event) => {
               const mobile = window.matchMedia("(max-width: 767px)").matches;

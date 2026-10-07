@@ -9,11 +9,15 @@ import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { verifySessionToken } from "@/lib/auth/jwt";
 import { ChatError } from "@/lib/chat/errors";
 import {
+  activeMemberIds,
   assertConversationMember,
   conversationIdsForUser,
   deleteMessageForEveryone,
   editTextMessage,
   listMessagesAfter,
+  markDelivered,
+  markRead,
+  memberReceipts,
   sendTextMessage,
 } from "@/lib/chat/store";
 
@@ -40,6 +44,16 @@ const syncSchema = z.object({
 
 const watchSchema = z.object({
   conversationId: z.number().int().positive(),
+});
+
+const typingSchema = z.object({
+  conversationId: z.number().int().positive(),
+  active: z.boolean(),
+});
+
+const readSchema = z.object({
+  conversationId: z.number().int().positive(),
+  messageId: z.number().int().positive(),
 });
 
 function readCookie(header: string | undefined, name: string): string | null {
@@ -164,6 +178,47 @@ export function startRealtimeServer(port: number): http.Server {
     next();
   });
 
+  const onlineCounts = new Map<number, number>();
+  const offlineTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+  function emitReceipt(conversationId: number) {
+    io.to(`conversation:${conversationId}`).emit("receipt", {
+      conversationId,
+      members: memberReceipts(conversationId),
+    });
+  }
+
+  function noteOnline(id: number) {
+    const next = (onlineCounts.get(id) ?? 0) + 1;
+    onlineCounts.set(id, next);
+    const pending = offlineTimers.get(id);
+    if (pending) clearTimeout(pending);
+    offlineTimers.delete(id);
+    if (next === 1) io.emit("presence", { userId: id, online: true });
+  }
+
+  function noteOffline(id: number) {
+    const next = Math.max(0, (onlineCounts.get(id) ?? 1) - 1);
+    onlineCounts.set(id, next);
+    if (next > 0) return;
+    const wait = Number(process.env.PRESENCE_OFFLINE_MS || 15_000);
+    const timer = setTimeout(() => {
+      offlineTimers.delete(id);
+      if ((onlineCounts.get(id) ?? 0) === 0) {
+        io.emit("presence", { userId: id, online: false });
+      }
+    }, wait);
+    offlineTimers.set(id, timer);
+  }
+
+  function deliverToOnline(conversationId: number, messageId: number, senderId: number) {
+    for (const memberId of activeMemberIds(conversationId)) {
+      if (memberId !== senderId && (onlineCounts.get(memberId) ?? 0) > 0) {
+        markDelivered(memberId, conversationId, messageId);
+      }
+    }
+  }
+
   io.on("connection", (socket) => {
     const userId = socket.data.userId as number;
     const sessionVersion = socket.data.sessionVersion as number;
@@ -171,11 +226,19 @@ export function startRealtimeServer(port: number): http.Server {
     for (const id of conversationIdsForUser(userId)) {
       socket.join(`conversation:${id}`);
     }
+    noteOnline(userId);
+    socket.emit(
+      "presence:snapshot",
+      [...onlineCounts.entries()].filter(([, count]) => count > 0).map(([id]) => id),
+    );
 
     const timer = setInterval(() => {
       if (!sessionStillValid(userId, sessionVersion)) socket.disconnect(true);
     }, 5 * 60 * 1000);
-    socket.on("disconnect", () => clearInterval(timer));
+    socket.on("disconnect", () => {
+      clearInterval(timer);
+      noteOffline(userId);
+    });
 
     socket.on("conversation:watch", (payload, ack) => {
       const parsed = watchSchema.safeParse(payload);
@@ -194,7 +257,9 @@ export function startRealtimeServer(port: number): http.Server {
       if (!parsed.success) return ack?.({ ok: false, error: "درخواست نامعتبر است" });
       try {
         const message = sendTextMessage({ userId, ...parsed.data });
+        deliverToOnline(message.conversationId, message.id, userId);
         io.to(`conversation:${message.conversationId}`).emit("message:new", message);
+        emitReceipt(message.conversationId);
         ack?.({ ok: true, message });
       } catch (error) {
         ack?.({ ok: false, error: error instanceof ChatError ? error.message : "خطا" });
@@ -225,12 +290,48 @@ export function startRealtimeServer(port: number): http.Server {
       }
     });
 
+    socket.on("typing", (payload) => {
+      const parsed = typingSchema.safeParse(payload);
+      if (!parsed.success) return;
+      try {
+        assertConversationMember(parsed.data.conversationId, userId);
+        const person = db
+          .select({ fullName: users.fullName })
+          .from(users)
+          .where(eq(users.id, userId))
+          .get();
+        socket.to(`conversation:${parsed.data.conversationId}`).emit("typing", {
+          conversationId: parsed.data.conversationId,
+          userId,
+          name: person?.fullName ?? "",
+          active: parsed.data.active,
+        });
+      } catch {
+        /* عضویت ندارد */
+      }
+    });
+
+    socket.on("receipt:read", (payload) => {
+      const parsed = readSchema.safeParse(payload);
+      if (!parsed.success) return;
+      try {
+        assertConversationMember(parsed.data.conversationId, userId);
+        markRead(userId, parsed.data.conversationId, parsed.data.messageId);
+        emitReceipt(parsed.data.conversationId);
+      } catch {
+        /* عضویت ندارد */
+      }
+    });
+
     socket.on("sync:after", (payload, ack) => {
       const parsed = syncSchema.safeParse(payload);
       if (!parsed.success) return ack?.({ ok: false, error: "درخواست نامعتبر است" });
       try {
         const missed = listMessagesAfter({ userId, ...parsed.data });
+        const last = missed.at(-1);
+        if (last) markDelivered(userId, parsed.data.conversationId, last.id);
         ack?.({ ok: true, messages: missed });
+        if (last) emitReceipt(parsed.data.conversationId);
       } catch (error) {
         ack?.({ ok: false, error: error instanceof ChatError ? error.message : "خطا" });
       }

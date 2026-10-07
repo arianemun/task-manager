@@ -369,6 +369,52 @@ export function listMessagesAfter(input: {
     .filter((row): row is ChatMessage => row != null);
 }
 
+export function markDelivered(
+  userId: number,
+  conversationId: number,
+  messageId: number,
+): void {
+  const member = activeMember(conversationId, userId);
+  if (!member) return;
+  const current = member.lastDeliveredMessageId ?? 0;
+  if (messageId <= current) return;
+  db.update(conversationMembers)
+    .set({ lastDeliveredMessageId: messageId })
+    .where(
+      and(
+        eq(conversationMembers.conversationId, conversationId),
+        eq(conversationMembers.userId, userId),
+      ),
+    )
+    .run();
+}
+
+export function memberReceipts(conversationId: number): Array<{
+  userId: number;
+  deliveredId: number;
+  readId: number;
+}> {
+  return db
+    .select({
+      userId: conversationMembers.userId,
+      deliveredId: conversationMembers.lastDeliveredMessageId,
+      readId: conversationMembers.lastReadMessageId,
+    })
+    .from(conversationMembers)
+    .where(
+      and(
+        eq(conversationMembers.conversationId, conversationId),
+        isNull(conversationMembers.leftAt),
+      ),
+    )
+    .all()
+    .map((row) => ({
+      userId: row.userId,
+      deliveredId: row.deliveredId ?? 0,
+      readId: row.readId ?? 0,
+    }));
+}
+
 export function markRead(userId: number, conversationId: number, messageId: number): void {
   const member = activeMember(conversationId, userId);
   if (!member) return;
@@ -505,6 +551,7 @@ export function listConversations(userId: number): ConversationSummary[] {
         unread: Number(unread?.n ?? 0),
         pinned: mine?.pinned ?? false,
         lastReadMessageId: mine?.lastReadMessageId ?? null,
+        peerId: conv.type === "DIRECT" ? (peer?.userId ?? null) : null,
       } satisfies ConversationSummary;
     })
     .sort((a, b) => {

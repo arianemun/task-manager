@@ -98,6 +98,13 @@ export const fa = {
     groupName: "نام گروه",
     jump: "پیام تازه",
     back: "بازگشت به گفتگوها",
+    online: "آنلاین",
+    away: "آفلاین",
+    typing: "در حال نوشتن…",
+    saved: "ذخیره شد",
+    delivered: "تحویل شد",
+    read: "خوانده شد",
+    openChat: "باز کردن",
   },
 
   status: {
