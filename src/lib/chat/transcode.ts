@@ -32,13 +32,68 @@ export async function probeDurationMs(file: string): Promise<number> {
   return Number.isFinite(seconds) ? Math.round(seconds * 1000) : 0;
 }
 
-/**
- * ویدیو را به H.264/AAC تبدیل می‌کند.
- * `-noautorotate` عمداً نیست: ffmpeg چرخش iPhone را روی پیکسل می‌نویسد
- * و بعد پرچم‌های متادیتا ماتریس نمایش را برمی‌دارند.
- */
-export async function transcodeVideoFile(input: string, output: string): Promise<void> {
-  await execFileAsync(ffmpegBin(), [
+export const VIDEO_MAXRATE = "2.5M";
+export const VIDEO_BUFSIZE = "5M";
+
+type VideoProbe = {
+  videoCodec: string | null;
+  audioCodec: string | null;
+  width: number;
+  height: number;
+  rotation: number;
+  majorBrand: string;
+  formatName: string;
+};
+
+export async function probeVideo(file: string): Promise<VideoProbe> {
+  const { stdout } = await execFileAsync(ffprobeBin(), [
+    "-v",
+    "error",
+    "-show_streams",
+    "-show_format",
+    "-of",
+    "json",
+    file,
+  ]);
+  const data = JSON.parse(String(stdout)) as {
+    streams?: Array<{
+      codec_type?: string;
+      codec_name?: string;
+      width?: number;
+      height?: number;
+      side_data_list?: Array<{ rotation?: number }>;
+    }>;
+    format?: { format_name?: string; tags?: Record<string, string> };
+  };
+  const video = data.streams?.find((stream) => stream.codec_type === "video");
+  const audio = data.streams?.find((stream) => stream.codec_type === "audio");
+  const rotation = Number(video?.side_data_list?.find((side) => typeof side.rotation === "number")?.rotation ?? 0);
+  let width = Number(video?.width ?? 0);
+  let height = Number(video?.height ?? 0);
+  if (Math.abs(rotation) % 180 === 90) [width, height] = [height, width];
+  return {
+    videoCodec: video?.codec_name ?? null,
+    audioCodec: audio?.codec_name ?? null,
+    width,
+    height,
+    rotation,
+    majorBrand: String(data.format?.tags?.major_brand ?? "").trim().toLowerCase(),
+    formatName: String(data.format?.format_name ?? ""),
+  };
+}
+
+function fits720p(width: number, height: number): boolean {
+  return Math.max(width, height) <= 1280 && Math.min(width, height) <= 720;
+}
+
+function canRemux(probe: VideoProbe): boolean {
+  const mp4 = probe.formatName.includes("mp4") && probe.majorBrand !== "qt";
+  const audioOk = probe.audioCodec === null || probe.audioCodec === "aac";
+  return probe.videoCodec === "h264" && audioOk && mp4 && fits720p(probe.width, probe.height);
+}
+
+export function videoEncodeArgs(input: string, output: string): string[] {
+  return [
     "-y",
     "-i",
     input,
@@ -50,13 +105,39 @@ export async function transcodeVideoFile(input: string, output: string): Promise
     "veryfast",
     "-crf",
     "23",
+    "-maxrate",
+    VIDEO_MAXRATE,
+    "-bufsize",
+    VIDEO_BUFSIZE,
     "-c:a",
     "aac",
     "-movflags",
     "+faststart",
     ...STRIP_METADATA_ARGS,
     output,
-  ]);
+  ];
+}
+
+/**
+ * اگر ورودی از قبل H.264 و AAC و حداکثر 720p و داخل mp4 باشد فقط remux می‌شود.
+ * در این حالت ماتریس چرخش می‌ماند چون `-c copy` آن را برنمی‌دارد.
+ * در غیر این صورت encode است و `-noautorotate` عمداً نیست تا چرخش روی پیکسل نوشته شود.
+ */
+export async function transcodeVideoFile(input: string, output: string): Promise<void> {
+  let probe: VideoProbe | null = null;
+  try {
+    probe = await probeVideo(input);
+  } catch {
+    probe = null;
+  }
+  if (probe && canRemux(probe)) {
+    const args = ["-y", "-i", input, "-map", "0:v:0"];
+    if (probe.audioCodec) args.push("-map", "0:a:0");
+    args.push("-c", "copy", "-movflags", "+faststart", ...STRIP_METADATA_ARGS, output);
+    await execFileAsync(ffmpegBin(), args);
+    return;
+  }
+  await execFileAsync(ffmpegBin(), videoEncodeArgs(input, output));
 }
 
 export async function convertHeicToJpeg(input: string, output: string): Promise<void> {
