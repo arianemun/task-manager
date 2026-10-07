@@ -22,6 +22,7 @@ export const PERMISSIONS = [
   "reports.view_department",
   "reports.export",
   "announcements.manage",
+  "chat.create_group",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -455,6 +456,143 @@ export const notDoneReasonDepartments = sqliteTable(
     primaryKey({ columns: [t.reasonId, t.departmentId] }),
     index("not_done_reason_departments_department_idx").on(t.departmentId),
   ],
+);
+
+export const CONVERSATION_TYPES = ["DIRECT", "GROUP"] as const;
+export type ConversationType = (typeof CONVERSATION_TYPES)[number];
+
+export const CONVERSATION_MEMBER_ROLES = ["OWNER", "ADMIN", "MEMBER"] as const;
+export type ConversationMemberRole =
+  (typeof CONVERSATION_MEMBER_ROLES)[number];
+
+export const MESSAGE_TYPES = [
+  "TEXT",
+  "IMAGE",
+  "VIDEO",
+  "VIDEO_NOTE",
+  "VOICE",
+  "SYSTEM",
+] as const;
+export type MessageType = (typeof MESSAGE_TYPES)[number];
+
+export const ATTACHMENT_STATUSES = [
+  "UPLOADING",
+  "PROCESSING",
+  "READY",
+  "FAILED",
+] as const;
+export type AttachmentStatus = (typeof ATTACHMENT_STATUSES)[number];
+
+export const conversations = sqliteTable(
+  "conversations",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    type: text("type").$type<ConversationType>().notNull(),
+    title: text("title"),
+    avatarPath: text("avatar_path"),
+    createdBy: integer("created_by")
+      .notNull()
+      .references(() => users.id),
+    departmentId: integer("department_id").references(() => departments.id, {
+      onDelete: "set null",
+    }),
+    /** زوج مستقیم، نرمال‌شده به صورت min:max */
+    pairKey: text("pair_key"),
+    lastMessageId: integer("last_message_id"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [
+    uniqueIndex("conversations_pair_key_unique").on(t.pairKey),
+    uniqueIndex("conversations_department_unique")
+      .on(t.departmentId)
+      .where(sql`${t.departmentId} is not null`),
+  ],
+);
+
+export const conversationMembers = sqliteTable(
+  "conversation_members",
+  {
+    conversationId: integer("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").$type<ConversationMemberRole>().notNull(),
+    joinedAt: integer("joined_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    leftAt: integer("left_at", { mode: "timestamp_ms" }),
+    lastReadMessageId: integer("last_read_message_id"),
+    lastDeliveredMessageId: integer("last_delivered_message_id"),
+    mutedUntil: integer("muted_until", { mode: "timestamp_ms" }),
+    pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+  },
+  (t) => [
+    primaryKey({ columns: [t.conversationId, t.userId] }),
+    index("conversation_members_user_id_idx").on(t.userId),
+  ],
+);
+
+export const messages = sqliteTable(
+  "messages",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    conversationId: integer("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    senderId: integer("sender_id")
+      .notNull()
+      .references(() => users.id),
+    type: text("type").$type<MessageType>().notNull(),
+    body: text("body"),
+    replyToId: integer("reply_to_id").references(
+      (): AnySQLiteColumn => messages.id,
+      { onDelete: "set null" },
+    ),
+    clientId: text("client_id").notNull(),
+    editedAt: integer("edited_at", { mode: "timestamp_ms" }),
+    deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [
+    uniqueIndex("messages_sender_client_unique").on(t.senderId, t.clientId),
+    index("messages_conversation_id_id_idx").on(t.conversationId, t.id),
+  ],
+);
+
+export const messageAttachments = sqliteTable(
+  "message_attachments",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    messageId: integer("message_id").references(() => messages.id, {
+      onDelete: "cascade",
+    }),
+    uploaderId: integer("uploader_id")
+      .notNull()
+      .references(() => users.id),
+    kind: text("kind").notNull(),
+    mime: text("mime").notNull(),
+    size: integer("size").notNull(),
+    path: text("path").notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    durationMs: integer("duration_ms"),
+    waveform: text("waveform", { mode: "json" }).$type<number[]>(),
+    thumbPath: text("thumb_path"),
+    status: text("status").$type<AttachmentStatus>().notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [index("message_attachments_status_idx").on(t.status)],
 );
 
 export const settings = sqliteTable("settings", {

@@ -386,6 +386,41 @@ html[data-keyboard="open"] [data-bottom-nav] {
   display: none;
 }
 
+html[data-chat-thread="open"] [data-bottom-nav] {
+  display: none;
+}
+
+html[data-chat-thread="open"] [data-has-bottom-nav] {
+  --bottom-chrome: 0px;
+}
+
+.chat-shell {
+  height: calc(100dvh - 3.5rem - var(--bottom-chrome) - var(--keyboard-inset));
+}
+
+.chat-pad-x {
+  padding-left: max(0.75rem, var(--safe-left));
+  padding-right: max(0.75rem, var(--safe-right));
+}
+
+.chat-composer {
+  padding-bottom: max(var(--safe-bottom), 0.75rem);
+}
+
+[data-page-container].chat-bleed {
+  max-width: none;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+@media (min-width: 768px) {
+  .chat-shell {
+    height: calc(100dvh - 4rem - var(--keyboard-inset));
+  }
+}
+
 [data-app-header] {
   padding-left: max(1rem, var(--safe-left));
   padding-right: max(1rem, var(--safe-right));

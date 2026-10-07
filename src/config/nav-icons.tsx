@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   ListTodo,
   Megaphone,
+  MessagesSquare,
   MessageSquareWarning,
   Settings,
   Shield,
@@ -40,6 +41,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   "my-report": FileText,
   "my-info": Info,
   profile: UserRound,
+  chat: MessagesSquare,
   "back-admin": LayoutDashboard,
 };
 

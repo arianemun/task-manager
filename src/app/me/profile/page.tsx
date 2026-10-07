@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AppCredit } from "@/components/layout/app-credit";
 import { AvatarForm } from "@/components/me/avatar-form";
 import { ChangePasswordDialog } from "@/components/me/change-password-dialog";
@@ -53,6 +54,9 @@ export default async function MeProfilePage() {
           {full?.position ? (
             <Row label="سمت" value={full.position} />
           ) : null}
+          <Link href="/me/info" className="text-primary inline-flex min-h-11 items-center">
+            {fa.nav.myInfo}
+          </Link>
         </CardContent>
       </Card>
 

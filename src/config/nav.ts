@@ -4,7 +4,21 @@ import { fa } from "@/lib/i18n/fa";
 
 export type NavGroupId = "main" | "manage" | "reports" | "settings" | "me";
 
-export type NavBadgeKind = "unread" | "unanswered";
+export type NavBadgeKind = "unread" | "unanswered" | "chat";
+
+export type NavBadges = {
+  unread: number;
+  unanswered: number;
+  chat: number;
+};
+
+export const STAFF_BOTTOM_NAV_IDS = [
+  "today",
+  "calendar",
+  "chat",
+  "my-report",
+  "profile",
+] as const;
 
 /** بدون کامپوننت — سریال‌پذیر برای Server → Client */
 export type NavItemConfig = {
@@ -36,6 +50,13 @@ export const ADMIN_NAV: NavItemConfig[] = [
     label: fa.nav.dashboard,
     group: "main",
     badge: "unanswered",
+  },
+  {
+    id: "chat",
+    href: "/chat",
+    label: fa.nav.chat,
+    group: "main",
+    badge: "chat",
   },
   {
     id: "my-tasks",
@@ -142,6 +163,13 @@ export const ME_NAV: NavItemConfig[] = [
     group: "me",
   },
   {
+    id: "chat",
+    href: "/chat",
+    label: fa.nav.chat,
+    group: "me",
+    badge: "chat",
+  },
+  {
     id: "my-report",
     href: "/me/report",
     label: fa.nav.myReport,
@@ -209,6 +237,7 @@ export const PATH_LABELS: Record<string, string> = {
   report: fa.nav.myReport,
   info: fa.nav.myInfo,
   profile: fa.nav.profile,
+  chat: fa.nav.chat,
   new: "جدید",
   login: fa.auth.login,
   "change-password": fa.auth.changePassword,

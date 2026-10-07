@@ -11,11 +11,13 @@ import type { AuthUser } from "@/lib/auth/user";
 type Props = {
   user: AuthUser;
   navItems: NavItemConfig[];
-  badges: { unread: number; unanswered: number };
+  badges: { unread: number; unanswered: number; chat: number };
   /** STAFF: bottom nav روی موبایل، بدون sidebar موبایل */
   variant: "admin" | "staff";
   /** عرض محتوا باریک‌تر (صفحات /me) */
   narrow?: boolean;
+  /** گفتگو: کانتینر بدون padding تا لبه امن یک‌بار در خود صفحه اعمال شود */
+  bleed?: boolean;
   children: ReactNode;
 };
 
@@ -25,6 +27,7 @@ export async function AppFrame({
   badges,
   variant,
   narrow = false,
+  bleed = false,
   children,
 }: Props) {
   const jar = await cookies();
@@ -62,9 +65,11 @@ export async function AppFrame({
         <PageContainer
           narrow={narrow}
           className={
-            staffMobile
-              ? "pb-[calc(var(--bottom-chrome)+1rem)] md:pb-6 lg:pb-8"
-              : undefined
+            bleed
+              ? "chat-bleed"
+              : staffMobile
+                ? "pb-[calc(var(--bottom-chrome)+1rem)] md:pb-6 lg:pb-8"
+                : undefined
           }
         >
           <div id="main-content">{children}</div>

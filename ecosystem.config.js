@@ -18,5 +18,18 @@ module.exports = {
         // BACKUP_DIR=/var/task-manager/backups
       },
     },
+    {
+      name: "task-manager-realtime",
+      cwd: ".",
+      script: "./node_modules/tsx/dist/cli.mjs",
+      args: "realtime/server.ts",
+      instances: 1,
+      exec_mode: "fork",
+      env: {
+        NODE_ENV: "production",
+        TZ: "Asia/Tehran",
+        REALTIME_PORT: 3231,
+      },
+    },
   ],
 };

@@ -9,6 +9,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "reports.view_department": "گزارش دپارتمان",
   "reports.export": "خروجی گزارش",
   "announcements.manage": "مدیریت اطلاعیه",
+  "chat.create_group": "ساخت گروه گفتگو",
 };
 
 export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
@@ -19,4 +20,5 @@ export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   "reports.view_department": "مشاهده گزارش دپارتمان خود",
   "reports.export": "خروجی CSV/Excel گزارش‌ها",
   "announcements.manage": "انتشار و حذف اطلاعیه",
+  "chat.create_group": "ساخت گروه و گروه دپارتمان",
 };

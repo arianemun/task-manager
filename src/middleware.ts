@@ -14,7 +14,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/change-password/");
   const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
   const isMe = pathname === "/me" || pathname.startsWith("/me/");
-  const isProtected = isAdmin || isMe || isChangePassword;
+  const isChat = pathname === "/chat" || pathname.startsWith("/chat/");
+  const isProtected = isAdmin || isMe || isChangePassword || isChat;
 
   // ریشه → ورود (صفحه فرود نداریم)
   if (pathname === "/") {
@@ -37,5 +38,13 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/change-password", "/admin/:path*", "/me/:path*"],
+  matcher: [
+    "/",
+    "/login",
+    "/change-password",
+    "/admin/:path*",
+    "/me/:path*",
+    "/chat",
+    "/chat/:path*",
+  ],
 };

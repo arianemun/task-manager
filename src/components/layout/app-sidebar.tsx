@@ -29,7 +29,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 type Props = {
   user: AuthUser;
   items: NavItemConfig[];
-  badges: { unread: number; unanswered: number };
+  badges: { unread: number; unanswered: number; chat: number };
   /** پرسنل: روی موبایل sidebar رندر نشود (bottom nav جایگزین) */
   hideOnMobile?: boolean;
 };
@@ -46,6 +46,7 @@ function badgeValue(
   if (item.badge === "unread" && badges.unread > 0) return badges.unread;
   if (item.badge === "unanswered" && badges.unanswered > 0)
     return badges.unanswered;
+  if (item.badge === "chat" && badges.chat > 0) return badges.chat;
   return null;
 }
 

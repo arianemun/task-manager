@@ -113,6 +113,25 @@ pm2 startup
 
 متغیرهای env را یا در `.env` ریشه (و لود توسط اپ) یا در بخش `env`ی `ecosystem.config.js` بگذارید. `TZ=Asia/Tehran` ضروری است.
 
+گفتگوی زنده یک پروسهٔ جداست (`task-manager-realtime` در همان فایل PM2). حالت اجرا `fork` و یک instance است. حافظهٔ Socket.IO داخل همین پروسه می‌ماند؛ اگر بعداً چند instance شود باید adapter جدا (مثلاً Redis) اضافه شود. Web Push در این مرحله نیست.
+
+nginx باید `/socket.io/` را به پورت داخلی realtime (پیش‌فرض ۳۲۳۱) بفرستد:
+
+```nginx
+location /socket.io/ {
+    proxy_pass http://127.0.0.1:3231;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 86400s;
+}
+```
+
+هر دو پروسه همان فایل SQLite را با WAL و `busy_timeout` حداقل ۵ ثانیه باز می‌کنند. `INTERNAL_SECRET` را در `.env` بگذارید تا Next بتواند سوکت کاربر را بعد از غیرفعال‌سازی یا ریست رمز قطع کند. `APP_ORIGIN` مبدأ مجاز مرورگر است. اتصال مرورگر به همان میزبان است؛ `connect-src 'self'` شامل `wss` همان میزبان می‌شود.
+
 اجرای مستقیم standalone:
 
 ```bash

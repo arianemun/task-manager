@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import { departmentIdsForUser } from "@/lib/departments/membership";
 import { resolvePermissions } from "@/lib/permissions";
+import { requestSocketDisconnect } from "@/lib/realtime/notify";
 import { AuthError } from "./errors";
 import { getSessionPayload } from "./session";
 
@@ -144,5 +145,6 @@ export function bumpSessionVersion(userId: number): number {
     })
     .where(eq(users.id, userId))
     .run();
+  requestSocketDisconnect(userId);
   return next;
 }

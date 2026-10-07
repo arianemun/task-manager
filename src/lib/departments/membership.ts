@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, departments, userDepartments, users } from "@/db/schema";
+import { syncDepartmentChat } from "@/lib/chat/store";
 import { compareGDate, todayTehran, type GDate } from "@/lib/dates";
 import { currentMembershipSql } from "@/lib/departments/intervals";
 
@@ -415,6 +416,10 @@ export function setUserDepartments(
       .run();
   });
 
+  for (const departmentId of [...added, ...removed]) {
+    syncDepartmentChat(departmentId);
+  }
+
   return { added, removed };
 }
 
@@ -434,6 +439,7 @@ export function closeDepartmentMembership(input: {
       legacyJoinedAt: input.legacyJoinedAt,
     });
   });
+  syncDepartmentChat(input.departmentId);
 }
 
 export function openDepartmentMembership(input: {
@@ -450,4 +456,5 @@ export function openDepartmentMembership(input: {
       actorId: input.actorId ?? null,
     });
   });
+  syncDepartmentChat(input.departmentId);
 }

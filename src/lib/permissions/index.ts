@@ -11,6 +11,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "reports.view_department",
     "reports.export",
     "announcements.manage",
+    "chat.create_group",
   ],
   STAFF: [],
 };

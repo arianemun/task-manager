@@ -2,18 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { NavItemConfig } from "@/config/nav";
+import { STAFF_BOTTOM_NAV_IDS, type NavItemConfig } from "@/config/nav";
 import { navIcon } from "@/config/nav-icons";
 import { cn, toFaDigits } from "@/lib/utils";
 
 type Props = {
   items: NavItemConfig[];
-  badges: { unread: number; unanswered: number };
+  badges: { unread: number; unanswered: number; chat: number };
 };
 
 export function StaffBottomNav({ items, badges }: Props) {
   const pathname = usePathname() || "/";
-  const shown = items.slice(0, 5);
+  const shown = STAFF_BOTTOM_NAV_IDS.map((id) =>
+    items.find((item) => item.id === id),
+  ).filter((item): item is NavItemConfig => Boolean(item));
 
   return (
     <nav
@@ -30,7 +32,9 @@ export function StaffBottomNav({ items, badges }: Props) {
           const badge =
             item.badge === "unread" && badges.unread > 0
               ? badges.unread
-              : null;
+              : item.badge === "chat" && badges.chat > 0
+                ? badges.chat
+                : null;
           return (
             <li key={item.id}>
               <Link

@@ -10,6 +10,7 @@ import {
 } from "@/db/schema";
 import type { AuthUser } from "@/lib/auth/user";
 import { userInDepartmentsSql } from "@/lib/departments/membership";
+import { countUnreadChats } from "@/lib/chat/store";
 import { todayTehran } from "@/lib/dates";
 
 /**
@@ -18,6 +19,7 @@ import { todayTehran } from "@/lib/dates";
 export const getNavBadges = cache(function getNavBadges(actor: AuthUser): {
   unread: number;
   unanswered: number;
+  chat: number;
 } {
   return {
     unread: countUnreadAnnouncementsFast(actor),
@@ -25,6 +27,7 @@ export const getNavBadges = cache(function getNavBadges(actor: AuthUser): {
       actor.role === "ADMIN" || actor.role === "MANAGER"
         ? countUnansweredTodayFast(actor)
         : 0,
+    chat: countUnreadChats(actor.id),
   };
 });
 

@@ -3,7 +3,14 @@ export const changelog = [
   {
     "version": "منتشرنشده",
     "date": null,
-    "sections": []
+    "sections": [
+      {
+        "title": "اضافه‌شده",
+        "items": [
+          "گفتگوی متنی: پیام، پاسخ، ویرایش تا ۱۵ دقیقه، حذف برای همه، و همگام‌سازی بعد از قطع اتصال. سرور Socket.IO جدا از Next است."
+        ]
+      }
+    ]
   },
   {
     "version": "1.2.2",
