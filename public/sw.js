@@ -67,3 +67,26 @@ self.addEventListener("fetch", (event) => {
     }),
   );
 });
+
+self.addEventListener("push", (event) => {
+  let payload = { title: "آزمایش اعلان", body: "", url: "/admin/push-lab" };
+  try {
+    if (event.data) payload = { ...payload, ...event.data.json() };
+  } catch {
+    payload.body = event.data ? event.data.text() : "";
+  }
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: payload.url || "/admin/push-lab" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/admin/push-lab";
+  event.waitUntil(self.clients.openWindow(url));
+});

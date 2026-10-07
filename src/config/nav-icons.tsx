@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
+  Bell,
   Building2,
   CalendarDays,
   CalendarOff,
@@ -36,6 +37,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   reports: FileBarChart2,
   audit: Shield,
   settings: Settings,
+  "push-lab": Bell,
   today: ListTodo,
   calendar: CalendarDays,
   "my-report": FileText,

@@ -146,6 +146,13 @@ export const ADMIN_NAV: NavItemConfig[] = [
     group: "settings",
     adminOnly: true,
   },
+  {
+    id: "push-lab",
+    href: "/admin/push-lab",
+    label: fa.nav.pushLab,
+    group: "settings",
+    adminOnly: true,
+  },
 ];
 
 /** منوی پرسنل (/me) */
@@ -234,6 +241,7 @@ export const PATH_LABELS: Record<string, string> = {
   reports: fa.nav.reports,
   audit: fa.nav.audit,
   settings: fa.nav.settings,
+  "push-lab": fa.nav.pushLab,
   calendar: fa.nav.calendar,
   report: fa.nav.myReport,
   info: fa.nav.myInfo,
