@@ -1,7 +1,20 @@
 export type SniffedMedia = {
   kind: "image" | "video";
-  ext: "jpg" | "png" | "webp" | "mp4" | "webm";
+  ext: "jpg" | "png" | "webp" | "heic" | "mp4" | "webm";
 };
+
+const HEIC_BRANDS = new Set(["heic", "heix", "hevc", "mif1", "msf1"]);
+
+function ftypBrands(buf: Buffer): string[] {
+  if (buf.length < 12 || buf.toString("ascii", 4, 8) !== "ftyp") return [];
+  const boxSize = buf.readUInt32BE(0);
+  const end = boxSize >= 16 ? Math.min(buf.length, boxSize) : buf.length;
+  const brands = [buf.toString("ascii", 8, 12)];
+  for (let offset = 16; offset + 4 <= end; offset += 4) {
+    brands.push(buf.toString("ascii", offset, offset + 4));
+  }
+  return brands.map((brand) => brand.toLowerCase().replace(/\0/g, "").trim()).filter(Boolean);
+}
 
 export function sniffMedia(buf: Buffer): SniffedMedia | null {
   if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
@@ -23,7 +36,9 @@ export function sniffMedia(buf: Buffer): SniffedMedia | null {
   ) {
     return { kind: "image", ext: "webp" };
   }
-  if (buf.length >= 12 && buf.toString("ascii", 4, 8) === "ftyp") {
+  const brands = ftypBrands(buf);
+  if (brands.length > 0) {
+    if (brands.some((brand) => HEIC_BRANDS.has(brand))) return { kind: "image", ext: "heic" };
     return { kind: "video", ext: "mp4" };
   }
   if (

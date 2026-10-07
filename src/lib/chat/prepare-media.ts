@@ -2,6 +2,8 @@ import { CHAT_IMAGE_MAX_BYTES, CHAT_VIDEO_MAX_BYTES, CHAT_VIDEO_MAX_MS } from ".
 
 export class MediaPrepareError extends Error {}
 
+export class BitmapUnreadError extends MediaPrepareError {}
+
 function videoDurationMs(file: File): Promise<number> {
   const url = URL.createObjectURL(file);
   const video = document.createElement("video");
@@ -20,8 +22,17 @@ function videoDurationMs(file: File): Promise<number> {
   });
 }
 
+function isImageFile(file: File): boolean {
+  return file.type.startsWith("image/") || /\.hei[cf]$/i.test(file.name);
+}
+
 async function compressImage(file: File): Promise<File> {
-  const bitmap = await createImageBitmap(file);
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new BitmapUnreadError("عکس در مرورگر خوانده نشد");
+  }
   const maxEdge = 1920;
   const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * scale));
@@ -41,12 +52,20 @@ async function compressImage(file: File): Promise<File> {
 }
 
 export async function prepareChatFile(file: File): Promise<{ file: File; kind: "image" | "video" }> {
-  if (file.type.startsWith("image/")) {
-    const compressed = await compressImage(file);
-    if (compressed.size > CHAT_IMAGE_MAX_BYTES) {
-      throw new MediaPrepareError("حجم عکس بعد از فشرده‌سازی هنوز زیاد است");
+  if (isImageFile(file)) {
+    try {
+      const compressed = await compressImage(file);
+      if (compressed.size > CHAT_IMAGE_MAX_BYTES) {
+        throw new MediaPrepareError("حجم عکس بعد از فشرده‌سازی هنوز زیاد است");
+      }
+      return { file: compressed, kind: "image" };
+    } catch (error) {
+      if (!(error instanceof BitmapUnreadError)) throw error;
+      if (file.size > CHAT_IMAGE_MAX_BYTES) {
+        throw new MediaPrepareError("حجم عکس حداکثر ۱۲ مگابایت است");
+      }
+      return { file, kind: "image" };
     }
-    return { file: compressed, kind: "image" };
   }
   if (file.type.startsWith("video/")) {
     if (file.size > CHAT_VIDEO_MAX_BYTES) {

@@ -20,6 +20,8 @@ import { parseByteRange } from "@/lib/uploads/range";
 type Params = { params: Promise<{ path: string[] }> };
 
 const MIME: Record<string, string> = {
+  ".heic": "image/heic",
+  ".heif": "image/heif",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".png": "image/png",

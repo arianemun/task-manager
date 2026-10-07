@@ -5,7 +5,13 @@ import { db } from "@/db";
 import { mediaJobs, messageAttachments } from "@/db/schema";
 import { resolveUploadPath } from "@/lib/uploads/avatar";
 import { loadMessage } from "./store";
-import { probeDurationMs, transcodeImageFile, transcodeVideoFile, writeThumbnail } from "./transcode";
+import {
+  convertHeicToJpeg,
+  probeDurationMs,
+  transcodeImageFile,
+  transcodeVideoFile,
+  writeThumbnail,
+} from "./transcode";
 import { CHAT_VIDEO_MAX_MS, type ChatMessage } from "./types";
 
 let busy = false;
@@ -32,7 +38,16 @@ async function transcode(attachmentId: number): Promise<void> {
     }
     await transcodeVideoFile(input, output);
   } else {
-    await transcodeImageFile(input, output);
+    let imageInput = input;
+    if (/\.hei[cf]$/i.test(input)) {
+      imageInput = path.join(dir, `${base}.decoded.jpg`);
+      await convertHeicToJpeg(input, imageInput);
+    }
+    try {
+      await transcodeImageFile(imageInput, output);
+    } finally {
+      if (imageInput !== input) await fs.rm(imageInput, { force: true });
+    }
   }
   await writeThumbnail(output, thumb, row.kind === "video" ? { at: "0.2" } : undefined);
   const stat = await fs.stat(output);

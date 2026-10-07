@@ -10,6 +10,16 @@ describe("عکس و ویدیوی گفتگو", () => {
   it("امضای فایل را از بایت‌ها می‌خواند", () => {
     expect(sniffMedia(Buffer.from([0xff, 0xd8, 0xff, 0xd9]))?.kind).toBe("image");
     expect(sniffMedia(Buffer.from("0000ftypisom", "ascii"))?.kind).toBe("video");
+    const heic = Buffer.alloc(20);
+    heic.writeUInt32BE(20, 0);
+    heic.write("ftypisom", 4, "ascii");
+    heic.write("mif1", 16, "ascii");
+    expect(sniffMedia(heic)).toEqual({ kind: "image", ext: "heic" });
+    for (const brand of ["heic", "heix", "hevc", "msf1"]) {
+      expect(sniffMedia(Buffer.from(`0000ftyp${brand}`, "ascii"))?.kind).toBe("image");
+    }
+    const hvc = Buffer.from("0000ftyphvc1", "ascii");
+    expect(sniffMedia(hvc)?.kind).toBe("video");
     expect(sniffMedia(Buffer.from("%PDF-1.7"))).toBeNull();
   });
 

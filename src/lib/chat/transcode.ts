@@ -59,6 +59,10 @@ export async function transcodeVideoFile(input: string, output: string): Promise
   ]);
 }
 
+export async function convertHeicToJpeg(input: string, output: string): Promise<void> {
+  await execFileAsync(heicConvertBin(), ["--quiet", input, output]);
+}
+
 export async function transcodeImageFile(input: string, output: string): Promise<void> {
   await execFileAsync(ffmpegBin(), [
     "-y",

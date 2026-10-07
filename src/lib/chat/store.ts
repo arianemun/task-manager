@@ -884,7 +884,7 @@ export async function createMediaMessage(input: {
   }
   assertConversationMember(input.conversationId, input.userId);
   const sniffed = sniffMedia(input.bytes);
-  if (!sniffed) throw new ChatError("فقط عکس jpg یا png یا webp، یا ویدیو mp4 یا webm مجاز است");
+  if (!sniffed) throw new ChatError("فقط عکس jpg یا png یا webp یا heic، یا ویدیو mp4 یا webm مجاز است");
   const limit = sniffed.kind === "video" ? CHAT_VIDEO_MAX_BYTES : CHAT_IMAGE_MAX_BYTES;
   if (input.bytes.length <= 0 || input.bytes.length > limit) {
     throw new ChatError(
@@ -908,6 +908,8 @@ export async function createMediaMessage(input: {
         ? "image/webp"
         : sniffed.ext === "webm"
           ? "video/webm"
+          : sniffed.ext === "heic"
+          ? "image/heic"
           : sniffed.kind === "video"
             ? "video/mp4"
             : "image/jpeg";
