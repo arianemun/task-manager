@@ -115,7 +115,7 @@ pm2 startup
 
 گفتگوی زنده یک پروسهٔ جداست (`task-manager-realtime` در همان فایل PM2). حالت اجرا `fork` و یک instance است. حافظهٔ Socket.IO داخل همین پروسه می‌ماند؛ اگر بعداً چند instance شود باید adapter جدا (مثلاً Redis) اضافه شود. Web Push در این مرحله نیست.
 
-nginx باید `/socket.io/` را به پورت داخلی realtime (پیش‌فرض ۳۲۳۱) بفرستد:
+nginx باید `/socket.io/` را به پورت داخلی realtime (پیش‌فرض ۳۲۳۱) بفرستد. برای ویدیوی چت، `client_max_body_size` حداقل ۱۱۰ مگابایت باشد و `location /api/files/` هدر `Range` را به Next برساند و `proxy_buffering` آن خاموش باشد:
 
 ```nginx
 location /socket.io/ {

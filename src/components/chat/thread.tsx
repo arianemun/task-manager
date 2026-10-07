@@ -27,7 +27,7 @@ import { MediaPrepareError, prepareChatFile } from "@/lib/chat/prepare-media";
 import { chatSocket } from "./socket";
 import { useOnlineIds } from "./use-presence";
 
-type Row = ChatMessage & { localStatus?: "sending" | "failed" };
+type Row = ChatMessage & { localStatus?: "sending" | "failed"; previewUrl?: string };
 
 const START_INDEX = 100_000;
 
@@ -70,6 +70,7 @@ export function ChatThread({
   const [mobileMenu, setMobileMenu] = useState(false);
   const [receipts, setReceipts] = useState(initialReceipts);
   const [typingName, setTypingName] = useState<string | null>(null);
+  const [mediaError, setMediaError] = useState("");
   const online = useOnlineIds();
   const typingIdle = useRef<number | null>(null);
   const markedRef = useRef(lastReadMessageId ?? 0);
@@ -279,9 +280,30 @@ export function ChatThread({
 
   async function onPickFile(file: File | undefined) {
     if (!file) return;
+    setMediaError("");
+    const clientId = newClientId();
+    let previewUrl = "";
     try {
       const prepared = await prepareChatFile(file);
-      const clientId = newClientId();
+      previewUrl = URL.createObjectURL(prepared.file);
+      const optimistic: Row = {
+        id: -Date.now(),
+        conversationId,
+        senderId: meId,
+        senderName: "",
+        senderActive: true,
+        type: prepared.kind === "video" ? "VIDEO" : "IMAGE",
+        body: null,
+        attachment: null,
+        replyTo: null,
+        clientId,
+        editedAt: null,
+        deletedAt: null,
+        createdAt: Date.now(),
+        localStatus: "sending",
+        previewUrl,
+      };
+      setRows((prev) => [...prev, optimistic]);
       const body = new FormData();
       body.set("file", prepared.file);
       body.set("conversationId", String(conversationId));
@@ -291,10 +313,13 @@ export function ChatThread({
       if (!response.ok || !payload.message) {
         throw new MediaPrepareError(payload.error || fa.chat.mediaFailed);
       }
+      URL.revokeObjectURL(previewUrl);
       merge(payload.message);
       router.refresh();
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : fa.chat.mediaFailed);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setRows((prev) => prev.filter((row) => row.clientId !== clientId));
+      setMediaError(error instanceof Error ? error.message : fa.chat.mediaFailed);
     }
   }
 
@@ -432,7 +457,26 @@ export function ChatThread({
                   <p className="italic">{fa.chat.deleted}</p>
                 ) : (
                   <>
+                    {message.previewUrl && message.type === "IMAGE" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={message.previewUrl}
+                        alt={fa.chat.photo}
+                        className="mb-1 max-h-80 w-full rounded-md object-contain"
+                      />
+                    ) : null}
+                    {message.previewUrl && message.type === "VIDEO" ? (
+                      <video
+                        src={message.previewUrl}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="mb-1 max-h-80 w-full rounded-md"
+                      />
+                    ) : null}
                     {message.attachment?.status === "READY" && message.attachment.kind === "image" && message.attachment.url ? (
+                      // فایل چت پشت احراز هویت است و از بهینه‌ساز عمومی next/image رد نمی‌شود.
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={message.attachment.url}
                         alt={fa.chat.photo}
@@ -454,8 +498,9 @@ export function ChatThread({
                         {message.attachment.status === "FAILED" ? fa.chat.mediaFailed : fa.chat.mediaProcessing}
                       </p>
                     ) : null}
+                  {message.body ? (
                   <p className="whitespace-pre-wrap break-words">
-                    {linkify(message.body ?? "").map((part, partIndex) =>
+                    {linkify(message.body).map((part, partIndex) =>
                       part.type === "link" ? (
                         <a
                           key={partIndex}
@@ -471,6 +516,7 @@ export function ChatThread({
                       ),
                     )}
                   </p>
+                  ) : null}
                   </>
                 )}
                 <p className="mt-1 text-end text-[11px] opacity-80">
@@ -551,6 +597,7 @@ export function ChatThread({
           onSubmit();
         }}
       >
+        {mediaError ? <p className="text-destructive mb-1 text-xs">{mediaError}</p> : null}
         {typingName ? (
           <p className="text-muted-foreground mb-1 text-xs">
             {`${typingName} ${fa.chat.typing}`}
