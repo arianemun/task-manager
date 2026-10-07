@@ -16,12 +16,13 @@ import {
 } from "@/db/schema";
 import { fa } from "@/lib/i18n/fa";
 import { ChatError } from "./errors";
-import { sniffMedia } from "./media-sniff";
+import { sniffAudio, sniffMedia } from "./media-sniff";
 import { assertSendRate } from "./rate-limit";
 import {
   CHAT_BODY_MAX,
   CHAT_EDIT_WINDOW_MS,
   CHAT_IMAGE_MAX_BYTES,
+  CHAT_VOICE_MAX_BYTES,
   CHAT_PAGE_SIZE,
   CHAT_VIDEO_MAX_BYTES,
   type ChatAttachment,
@@ -118,17 +119,20 @@ function toAttachment(row: {
   width: number | null;
   height: number | null;
   durationMs: number | null;
+  waveform?: number[] | null;
 }): ChatAttachment {
   const ready = row.status === "READY";
+  const kind = row.kind === "video" ? "video" : row.kind === "voice" ? "voice" : "image";
   return {
     id: row.id,
-    kind: row.kind === "video" ? "video" : "image",
+    kind,
     status: row.status,
     url: ready ? `/api/files/${row.path}` : null,
     thumbUrl: ready && row.thumbPath ? `/api/files/${row.thumbPath}` : null,
     width: row.width,
     height: row.height,
     durationMs: row.durationMs,
+    waveform: row.waveform ?? null,
   };
 }
 
@@ -624,7 +628,9 @@ export function listConversations(userId: number): ConversationSummary[] {
               ? fa.chat.photo
               : last?.type === "VIDEO"
                 ? fa.chat.video
-                : null),
+                : last?.type === "VOICE"
+                  ? fa.chat.voice
+                  : null),
         lastAt: last?.createdAt.getTime() ?? conv.updatedAt.getTime(),
         unread: Number(unread?.n ?? 0),
         pinned: mine?.pinned ?? false,
@@ -932,6 +938,87 @@ export async function createMediaMessage(input: {
         messageId: inserted.id,
         uploaderId: input.userId,
         kind: sniffed.kind,
+        mime,
+        size: input.bytes.length,
+        path: relative,
+        status: "PROCESSING",
+        createdAt: now,
+      })
+      .returning({ id: messageAttachments.id })
+      .get();
+    db.insert(mediaJobs)
+      .values({ attachmentId: attachment.id, status: "PENDING", createdAt: now, updatedAt: now })
+      .run();
+    db.update(conversations)
+      .set({ lastMessageId: inserted.id, updatedAt: now })
+      .where(eq(conversations.id, input.conversationId))
+      .run();
+    const loaded = loadMessage(inserted.id);
+    if (!loaded) throw new ChatError("پیام ذخیره نشد");
+    return loaded;
+  } catch (error) {
+    if (isUniqueError(error)) {
+      const again = existingByClient(input.userId, input.clientId);
+      if (again) return again;
+    }
+    throw error;
+  }
+}
+
+export async function createVoiceMessage(input: {
+  userId: number;
+  conversationId: number;
+  clientId: string;
+  bytes: Buffer;
+  now?: number;
+}): Promise<ChatMessage> {
+  if (!input.clientId || input.clientId.length > 80) {
+    throw new ChatError("شناسه پیام نامعتبر است");
+  }
+  const prior = existingByClient(input.userId, input.clientId);
+  if (prior) return prior;
+  const sender = db
+    .select({ isActive: users.isActive, deletedAt: users.deletedAt })
+    .from(users)
+    .where(eq(users.id, input.userId))
+    .get();
+  if (!sender || !sender.isActive || sender.deletedAt) {
+    throw new ChatError("حساب غیرفعال است");
+  }
+  assertConversationMember(input.conversationId, input.userId);
+  const ext = sniffAudio(input.bytes);
+  if (!ext) throw new ChatError("فقط پیام صوتی مجاز است");
+  if (input.bytes.length <= 0 || input.bytes.length > CHAT_VOICE_MAX_BYTES) {
+    throw new ChatError("حجم پیام صوتی زیاد است");
+  }
+  assertSendRate(input.userId, input.now ?? Date.now());
+  const now = new Date(input.now ?? Date.now());
+  const relDir = path.join("chat", String(input.conversationId));
+  const filename = `${randomBytes(8).toString("hex")}.${ext}`;
+  const relative = path.join(relDir, filename).replace(/\\/g, "/");
+  const absDir = path.join(uploadRoot(), relDir);
+  await fs.mkdir(absDir, { recursive: true });
+  await fs.writeFile(path.join(absDir, filename), input.bytes);
+  const mime = ext === "ogg" ? "audio/ogg" : ext === "m4a" ? "audio/mp4" : "audio/webm";
+  try {
+    const inserted = db
+      .insert(messages)
+      .values({
+        conversationId: input.conversationId,
+        senderId: input.userId,
+        type: "VOICE",
+        body: null,
+        clientId: input.clientId,
+        createdAt: now,
+      })
+      .returning({ id: messages.id })
+      .get();
+    const attachment = db
+      .insert(messageAttachments)
+      .values({
+        messageId: inserted.id,
+        uploaderId: input.userId,
+        kind: "voice",
         mime,
         size: input.bytes.length,
         path: relative,

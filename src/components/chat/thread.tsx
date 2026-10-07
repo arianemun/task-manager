@@ -25,6 +25,8 @@ import { markChatReadAction, olderMessagesAction } from "@/server/actions/chat";
 import { loadOutbox, newClientId, removeOutbox, saveOutbox, type OutboxItem } from "./outbox";
 import { MediaPrepareError, prepareChatFile } from "@/lib/chat/prepare-media";
 import { chatSocket } from "./socket";
+import { VoiceBubble } from "./voice-bubble";
+import { VoiceHold } from "./voice-hold";
 import { useOnlineIds } from "./use-presence";
 
 type Row = ChatMessage & { localStatus?: "sending" | "failed"; previewUrl?: string };
@@ -323,6 +325,45 @@ export function ChatThread({
     }
   }
 
+  async function onVoice(file: File) {
+    setMediaError("");
+    const clientId = newClientId();
+    const optimistic: Row = {
+      id: -Date.now(),
+      conversationId,
+      senderId: meId,
+      senderName: "",
+      senderActive: true,
+      type: "VOICE",
+      body: null,
+      attachment: null,
+      replyTo: null,
+      clientId,
+      editedAt: null,
+      deletedAt: null,
+      createdAt: Date.now(),
+      localStatus: "sending",
+    };
+    setRows((prev) => [...prev, optimistic]);
+    try {
+      const body = new FormData();
+      body.set("file", file);
+      body.set("kind", "voice");
+      body.set("conversationId", String(conversationId));
+      body.set("clientId", clientId);
+      const response = await fetch("/api/chat/media", { method: "POST", body });
+      const payload = (await response.json()) as { message?: ChatMessage; error?: string };
+      if (!response.ok || !payload.message) {
+        throw new MediaPrepareError(payload.error || fa.chat.mediaFailed);
+      }
+      merge(payload.message);
+      router.refresh();
+    } catch (error) {
+      setRows((prev) => prev.filter((row) => row.clientId !== clientId));
+      setMediaError(error instanceof Error ? error.message : fa.chat.mediaFailed);
+    }
+  }
+
   function openMenu(message: ChatMessage, mobile: boolean) {
     setMenu(message);
     setMobileMenu(mobile);
@@ -493,6 +534,13 @@ export function ChatThread({
                         className="mb-1 max-h-80 w-full rounded-md"
                       />
                     ) : null}
+                    {message.attachment?.status === "READY" && message.attachment.kind === "voice" && message.attachment.url ? (
+                      <VoiceBubble
+                        url={message.attachment.url}
+                        waveform={message.attachment.waveform}
+                        durationMs={message.attachment.durationMs}
+                      />
+                    ) : null}
                     {message.attachment && message.attachment.status !== "READY" ? (
                       <p className="mb-1 text-xs">
                         {message.attachment.status === "FAILED" ? fa.chat.mediaFailed : fa.chat.mediaProcessing}
@@ -658,9 +706,13 @@ export function ChatThread({
               }
             }}
           />
-          <Button type="submit" className="md:hidden">
-            {fa.chat.send}
-          </Button>
+          {draft.trim() || editing ? (
+            <Button type="submit" className="md:hidden">
+              {fa.chat.send}
+            </Button>
+          ) : (
+            <VoiceHold onRecorded={(file) => void onVoice(file)} onError={setMediaError} />
+          )}
         </div>
       </form>
     </div>

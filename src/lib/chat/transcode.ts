@@ -140,6 +140,49 @@ export async function transcodeVideoFile(input: string, output: string): Promise
   await execFileAsync(ffmpegBin(), videoEncodeArgs(input, output));
 }
 
+export async function transcodeVoiceFile(input: string, output: string): Promise<number[]> {
+  await execFileAsync(ffmpegBin(), [
+    "-y",
+    "-i",
+    input,
+    "-vn",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "64k",
+    "-movflags",
+    "+faststart",
+    ...STRIP_METADATA_ARGS,
+    output,
+  ]);
+  return waveformPeaks(output);
+}
+
+export async function waveformPeaks(file: string, bars = 48): Promise<number[]> {
+  const { stdout } = await execFileAsync(
+    ffmpegBin(),
+    ["-v", "error", "-i", file, "-ac", "1", "-ar", "8000", "-f", "s16le", "pipe:1"],
+    { encoding: "buffer", maxBuffer: 8 * 1024 * 1024 },
+  );
+  const pcm = Buffer.isBuffer(stdout) ? stdout : Buffer.from(stdout);
+  const count = Math.floor(pcm.length / 2);
+  const peaks = Array.from({ length: bars }, () => 0);
+  if (count === 0) return peaks;
+  const step = Math.max(1, Math.floor(count / bars));
+  for (let bar = 0; bar < bars; bar += 1) {
+    const start = bar * step;
+    const end = bar === bars - 1 ? count : Math.min(count, start + step);
+    let peak = 0;
+    for (let index = start; index < end; index += 1) {
+      const value = Math.abs(pcm.readInt16LE(index * 2));
+      if (value > peak) peak = value;
+    }
+    peaks[bar] = peak;
+  }
+  const max = Math.max(...peaks, 1);
+  return peaks.map((peak) => Math.round((peak / max) * 100));
+}
+
 export async function convertHeicToJpeg(input: string, output: string): Promise<void> {
   await execFileAsync(heicConvertBin(), ["--quiet", input, output]);
 }

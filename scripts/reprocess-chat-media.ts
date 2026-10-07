@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../src/db";
 import { messageAttachments } from "../src/db/schema";
 import { resolveUploadPath } from "../src/lib/uploads/avatar";
-import { transcodeImageFile, transcodeVideoFile, writeThumbnail } from "../src/lib/chat/transcode";
+import { transcodeImageFile, transcodeVideoFile, transcodeVoiceFile, writeThumbnail } from "../src/lib/chat/transcode";
 
 function tempBeside(file: string): string {
   const ext = path.extname(file);
@@ -32,8 +32,11 @@ async function main() {
     const abs = resolveUploadPath(row.path);
     await fs.access(abs);
     if (row.kind === "video") await replaceWith(abs, abs, transcodeVideoFile);
+    else if (row.kind === "voice") await replaceWith(abs, abs, async (src, dest) => {
+      await transcodeVoiceFile(src, dest);
+    });
     else await replaceWith(abs, abs, transcodeImageFile);
-    if (row.thumbPath) {
+    if (row.thumbPath && row.kind !== "voice") {
       const thumb = resolveUploadPath(row.thumbPath);
       const tmpThumb = tempBeside(thumb);
       await writeThumbnail(abs, tmpThumb, row.kind === "video" ? { at: "0.2" } : undefined);

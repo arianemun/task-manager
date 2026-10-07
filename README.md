@@ -130,7 +130,7 @@ location /socket.io/ {
 }
 ```
 
-عکس HEIC با `heif-convert` از بستهٔ `libheif-examples` به JPEG تبدیل می‌شود، بعد همان محدودیت ابعاد و حذف EXIF بقیهٔ عکس‌ها روی آن اجرا می‌شود. نصب: `sudo apt-get install -y libheif-examples libheif-plugin-libde265`. رمزگشای HEVC برای عکس آیفون لازم است. اگر باینری جای دیگری است، `HEIC_CONVERT_BIN` را در env بگذارید؛ پیش‌فرض `heif-convert` از PATH است.
+پیام صوتی با ffmpeg به AAC داخل M4A تبدیل می‌شود و متادیتا حذف می‌گردد. عکس HEIC با `heif-convert` از بستهٔ `libheif-examples` به JPEG تبدیل می‌شود، بعد همان محدودیت ابعاد و حذف EXIF بقیهٔ عکس‌ها روی آن اجرا می‌شود. نصب: `sudo apt-get install -y libheif-examples libheif-plugin-libde265`. رمزگشای HEVC برای عکس آیفون لازم است. اگر باینری جای دیگری است، `HEIC_CONVERT_BIN` را در env بگذارید؛ پیش‌فرض `heif-convert` از PATH است.
 
 هر دو پروسه همان فایل SQLite را با WAL و `busy_timeout` حداقل ۵ ثانیه باز می‌کنند. `INTERNAL_SECRET` را در `.env` بگذارید تا Next بتواند سوکت کاربر را بعد از غیرفعال‌سازی یا ریست رمز قطع کند. `APP_ORIGIN` مبدأ مجاز مرورگر است. اتصال مرورگر به همان میزبان است؛ `connect-src 'self'` شامل `wss` همان میزبان می‌شود.
 

@@ -52,3 +52,19 @@ export function sniffMedia(buf: Buffer): SniffedMedia | null {
   }
   return null;
 }
+
+export function sniffAudio(buf: Buffer): "webm" | "ogg" | "m4a" | null {
+  if (
+    buf.length > 4 &&
+    buf[0] === 0x1a &&
+    buf[1] === 0x45 &&
+    buf[2] === 0xdf &&
+    buf[3] === 0xa3
+  ) {
+    return "webm";
+  }
+  if (buf.length > 4 && buf.toString("ascii", 0, 4) === "OggS") return "ogg";
+  const brands = ftypBrands(buf);
+  if (brands.length === 0 || brands.some((brand) => HEIC_BRANDS.has(brand))) return null;
+  return "m4a";
+}

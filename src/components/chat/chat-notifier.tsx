@@ -23,7 +23,9 @@ export function ChatNotifier({ userId }: { userId: number }) {
             ? fa.chat.photo
             : message.type === "VIDEO"
               ? fa.chat.video
-              : fa.chat.deleted),
+              : message.type === "VOICE"
+                ? fa.chat.voice
+                : fa.chat.deleted),
         action: {
           label: fa.chat.openChat,
           onClick: () => router.push(`/chat/${message.conversationId}`),

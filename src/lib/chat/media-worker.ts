@@ -10,9 +10,10 @@ import {
   probeDurationMs,
   transcodeImageFile,
   transcodeVideoFile,
+  transcodeVoiceFile,
   writeThumbnail,
 } from "./transcode";
-import { CHAT_VIDEO_MAX_MS, type ChatMessage } from "./types";
+import { CHAT_VIDEO_MAX_MS, CHAT_VOICE_MAX_MS, type ChatMessage } from "./types";
 
 let busy = false;
 
@@ -26,17 +27,26 @@ async function transcode(attachmentId: number): Promise<void> {
   const input = resolveUploadPath(row.path);
   const dir = path.dirname(input);
   const base = path.basename(input, path.extname(input));
-  const outputName = row.kind === "video" ? `${base}.ready.mp4` : `${base}.ready.jpg`;
+  const outputName =
+    row.kind === "video" ? `${base}.ready.mp4` : row.kind === "voice" ? `${base}.ready.m4a` : `${base}.ready.jpg`;
   const thumbName = `${base}.thumb.jpg`;
   const output = path.join(dir, outputName);
   const thumb = path.join(dir, thumbName);
   let durationMs: number | null = null;
+  let waveform: number[] | null = null;
   if (row.kind === "video") {
     durationMs = await probeDurationMs(input);
     if (durationMs > CHAT_VIDEO_MAX_MS) {
       throw new Error("ویدیو حداکثر ۵ دقیقه است");
     }
     await transcodeVideoFile(input, output);
+    await writeThumbnail(output, thumb, { at: "0.2" });
+  } else if (row.kind === "voice") {
+    durationMs = await probeDurationMs(input);
+    if (durationMs > CHAT_VOICE_MAX_MS) {
+      throw new Error("پیام صوتی حداکثر ۵ دقیقه است");
+    }
+    waveform = await transcodeVoiceFile(input, output);
   } else {
     let imageInput = input;
     if (/\.hei[cf]$/i.test(input)) {
@@ -48,18 +58,21 @@ async function transcode(attachmentId: number): Promise<void> {
     } finally {
       if (imageInput !== input) await fs.rm(imageInput, { force: true });
     }
+    await writeThumbnail(output, thumb);
   }
-  await writeThumbnail(output, thumb, row.kind === "video" ? { at: "0.2" } : undefined);
   const stat = await fs.stat(output);
   const relativeOut = path.posix.join(path.posix.dirname(row.path), outputName);
   const relativeThumb = path.posix.join(path.posix.dirname(row.path), thumbName);
+  const mime =
+    row.kind === "video" ? "video/mp4" : row.kind === "voice" ? "audio/mp4" : "image/jpeg";
   db.update(messageAttachments)
     .set({
       path: relativeOut,
-      thumbPath: relativeThumb,
-      mime: row.kind === "video" ? "video/mp4" : "image/jpeg",
+      thumbPath: row.kind === "voice" ? null : relativeThumb,
+      mime,
       size: stat.size,
       durationMs,
+      waveform,
       status: "READY",
     })
     .where(eq(messageAttachments.id, row.id))

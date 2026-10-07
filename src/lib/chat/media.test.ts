@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { sniffMedia } from "./media-sniff";
+import { sniffAudio, sniffMedia } from "./media-sniff";
 import { parseByteRange } from "@/lib/uploads/range";
 
 describe("عکس و ویدیوی گفتگو", () => {
@@ -21,6 +21,9 @@ describe("عکس و ویدیوی گفتگو", () => {
     const hvc = Buffer.from("0000ftyphvc1", "ascii");
     expect(sniffMedia(hvc)?.kind).toBe("video");
     expect(sniffMedia(Buffer.from("%PDF-1.7"))).toBeNull();
+    expect(sniffAudio(Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x01]))).toBe("webm");
+    expect(sniffAudio(Buffer.from("OggSxxxx"))).toBe("ogg");
+    expect(sniffAudio(heic)).toBeNull();
   });
 
   it("بازهٔ Range را برای پاسخ ۲۰۶ حساب می‌کند", () => {
@@ -117,6 +120,73 @@ describe("عکس و ویدیوی گفتگو", () => {
           bytes: jpeg,
         }),
       ).rejects.toThrow(/دسترسی/);
+    });
+
+    it("ویس را در صف می‌گذارد و غیرعضو را رد می‌کند", async () => {
+      const { db } = await import("@/db");
+      const schema = await import("@/db/schema");
+      const store = await import("./store");
+      const a = db
+        .insert(schema.users)
+        .values({
+          username: "voice-a",
+          fullName: "الف",
+          fullNameNormalized: "الف",
+          passwordHash: "x",
+          role: "STAFF",
+          mustChangePassword: false,
+          isActive: true,
+        })
+        .returning({ id: schema.users.id })
+        .get();
+      const b = db
+        .insert(schema.users)
+        .values({
+          username: "voice-b",
+          fullName: "ب",
+          fullNameNormalized: "ب",
+          passwordHash: "x",
+          role: "STAFF",
+          mustChangePassword: false,
+          isActive: true,
+        })
+        .returning({ id: schema.users.id })
+        .get();
+      const conversationId = store.createDirectConversation(a.id, b.id);
+      const webm = Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x01]);
+      const message = await store.createVoiceMessage({
+        userId: a.id,
+        conversationId,
+        clientId: "voice-1",
+        bytes: webm,
+      });
+      expect(message.type).toBe("VOICE");
+      expect(message.attachment?.kind).toBe("voice");
+      expect(message.attachment?.waveform).toBeNull();
+      const jobs = db.select().from(schema.mediaJobs).all();
+      expect(jobs.some((job) => job.status === "PENDING")).toBe(true);
+      const stranger = db
+        .insert(schema.users)
+        .values({
+          username: "voice-c",
+          fullName: "ج",
+          fullNameNormalized: "ج",
+          passwordHash: "x",
+          role: "STAFF",
+          mustChangePassword: false,
+          isActive: true,
+        })
+        .returning({ id: schema.users.id })
+        .get();
+      await expect(
+        store.createVoiceMessage({
+          userId: stranger.id,
+          conversationId,
+          clientId: "voice-2",
+          bytes: webm,
+        }),
+      ).rejects.toThrow(/دسترسی/);
+      expect(b.id).not.toBe(stranger.id);
     });
   });
 });

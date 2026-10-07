@@ -27,6 +27,8 @@ const MIME: Record<string, string> = {
   ".png": "image/png",
   ".webp": "image/webp",
   ".pdf": "application/pdf",
+  ".m4a": "audio/mp4",
+  ".ogg": "audio/ogg",
   ".mp4": "video/mp4",
   ".webm": "video/webm",
 };

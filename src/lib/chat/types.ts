@@ -2,13 +2,14 @@ import type { AttachmentStatus, ConversationType, MessageType } from "@/db/schem
 
 export type ChatAttachment = {
   id: number;
-  kind: "image" | "video";
+  kind: "image" | "video" | "voice";
   status: AttachmentStatus;
   url: string | null;
   thumbUrl: string | null;
   width: number | null;
   height: number | null;
   durationMs: number | null;
+  waveform: number[] | null;
 };
 
 export type ChatMessage = {
@@ -56,5 +57,7 @@ export const CHAT_BODY_MAX = 4000;
 export const CHAT_VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 export const CHAT_VIDEO_MAX_MS = 5 * 60 * 1000;
 export const CHAT_IMAGE_MAX_BYTES = 12 * 1024 * 1024;
+export const CHAT_VOICE_MAX_BYTES = 16 * 1024 * 1024;
+export const CHAT_VOICE_MAX_MS = 5 * 60 * 1000;
 export const CHAT_EDIT_WINDOW_MS = 15 * 60 * 1000;
 export const CHAT_PAGE_SIZE = 40;
