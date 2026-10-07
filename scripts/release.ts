@@ -42,8 +42,8 @@ if (!body.trim()) {
 }
 
 const jalali = toFaDigits(format(new Date(), "yyyy/MM/dd"));
-const released = `## [${nextVersion}] - ${jalali}${body.endsWith("\n") ? body : `${body}\n`}`;
-const nextMarkdown = `${markdown.slice(0, start)}${marker}\n\n${released}${rest.replace(/^\n/, "")}`;
+const released = `## [${nextVersion}] - ${jalali}\n${body.trim()}\n\n`;
+const nextMarkdown = `${markdown.slice(0, start)}${marker}\n\n${released}${rest.replace(/^\n+/, "")}`;
 pkg.version = nextVersion;
 fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 fs.writeFileSync(changelogPath, nextMarkdown.endsWith("\n") ? nextMarkdown : `${nextMarkdown}\n`);
