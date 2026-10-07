@@ -49,7 +49,7 @@ export function ConversationList({
           value={q}
           onChange={(event) => setQ(event.target.value)}
           placeholder={fa.chat.search}
-          className="border-input bg-background h-11 w-full rounded-md border px-3 text-sm"
+          className="border-input bg-background h-11 w-full rounded-md border px-3 text-base md:text-sm"
         />
       </div>
       <ul className="min-h-0 flex-1 overflow-y-auto">

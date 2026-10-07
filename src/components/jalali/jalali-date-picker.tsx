@@ -70,7 +70,7 @@ export function JalaliDatePicker({
       variant="outline"
       disabled={disabled}
       className={cn(
-        "h-9 w-full justify-start gap-2 text-start font-normal",
+        "h-11 w-full justify-start gap-2 text-start text-base font-normal md:h-9 md:text-sm",
         !value && "text-muted-foreground",
         className,
       )}
@@ -176,7 +176,7 @@ export function JalaliDateRangePicker({
       variant="outline"
       disabled={disabled}
       className={cn(
-        "h-9 w-full justify-start gap-2 text-start font-normal",
+        "h-11 w-full justify-start gap-2 text-start text-base font-normal md:h-9 md:text-sm",
         !from && "text-muted-foreground",
         className,
       )}

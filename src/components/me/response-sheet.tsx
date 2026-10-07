@@ -144,7 +144,7 @@ export function ResponseSheet({
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,application/pdf"
-                className="block w-full text-sm"
+                className="block w-full text-base md:text-sm"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
               {file ? (

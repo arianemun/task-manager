@@ -126,7 +126,7 @@ export function NewChatButton(props: {
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
                   placeholder={fa.chat.groupName}
-                  className="border-input mb-3 h-11 w-full rounded-md border px-3"
+                  className="border-input mb-3 h-11 w-full rounded-md border px-3 text-base md:text-sm"
                 />
               ) : null}
               <Command className="border">

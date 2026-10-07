@@ -99,5 +99,6 @@
 - [ ] iPhone به‌صورت PWA نصب‌شده
 - [ ] Android Chrome
 - [ ] Android PWA
+- [ ] لمس هر فیلد در iPhone بدون زوم خودکار: فرم پرسنل، فرم کار، فیلتر گزارش، Combobox جستجو، DatePicker و composer چت
 
 انتظار: bottom nav فقط یک‌بار safe area زیر آیکن‌ها دارد؛ Drawer و دکمه sticky روی nav یا زیر home indicator شناور نیستند؛ با کیبورد باز، nav پنهان است و دکمه sticky بالای کیبورد می‌ماند. روی دسکتاپ این فاصله‌ها صفر است.

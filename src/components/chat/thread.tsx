@@ -461,7 +461,7 @@ export function ChatThread({
             value={draft}
             rows={1}
             placeholder={fa.chat.placeholder}
-            className="border-input max-h-[9rem] min-h-11 flex-1 resize-none rounded-md border px-3 py-2 text-sm leading-[1.7]"
+            className="border-input max-h-[9rem] min-h-11 flex-1 resize-none rounded-md border px-3 py-2 text-base leading-[1.7] md:text-sm"
             onChange={(event) => {
               setDraft(event.target.value);
               event.target.style.height = "auto";

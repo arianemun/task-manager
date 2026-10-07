@@ -118,7 +118,7 @@ export default async function BoardPage({ searchParams }: Props) {
           id="board-department"
           name="departmentId"
           defaultValue={departmentId ? String(departmentId) : ""}
-          className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+          className="border-input bg-background h-11 rounded-md border px-2 text-base md:h-9 md:text-sm"
         >
           <option value="">همه</option>
           {departments.map((item) => (
