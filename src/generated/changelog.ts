@@ -3,7 +3,14 @@ export const changelog = [
   {
     "version": "منتشرنشده",
     "date": null,
-    "sections": []
+    "sections": [
+      {
+        "title": "اضافه‌شده",
+        "items": [
+          "مرکز اعلان داخل اپ: زنگ هدر با badge جدا از گفتگو، Popover در دسکتاپ و Drawer در موبایل، و صفحهٔ `/notifications`. اعلان تازه از همان سرور Socket.IO به زنگ می‌رسد. اطلاعیهٔ جدید برای مخاطبانش ثبت می‌شود. پیام چت در زنگ تکرار نمی‌شود."
+        ]
+      }
+    ]
   },
   {
     "version": "1.3.2",
