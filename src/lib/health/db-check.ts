@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import fs from "node:fs";
 import path from "node:path";
 import { db, type Db } from "@/db";
@@ -6,7 +6,9 @@ import {
   auditLogs,
   settings,
   taskAssignments,
+  conversationMembers,
   mediaJobs,
+  messageAttachments,
   taskOccurrences,
   taskTemplates,
   userDepartments,
@@ -26,6 +28,7 @@ import {
   LAST_OCCURRENCE_GENERATED_KEY,
   LAST_PERIOD_CLOSE_KEY,
 } from "@/lib/settings/system-keys";
+import { uploadRoot } from "@/lib/chat/media-size";
 import { toFaDigits } from "@/lib/utils";
 
 const SAMPLE_LIMIT = 10;
@@ -45,7 +48,10 @@ export type HealthCheckId =
   | "backup_stale"
   | "close_stale"
   | "source_department"
-  | "media_jobs";
+  | "media_jobs"
+  | "chat_orphan_attachment"
+  | "chat_disk_mismatch"
+  | "chat_inactive_member";
 
 export type HealthFinding = {
   id: HealthCheckId;
@@ -579,6 +585,98 @@ function closeStale(database: Db) {
 }
 
 const MEDIA_JOB_STUCK_MS = 60 * 60 * 1000;
+const CHAT_ORPHAN_MS = 24 * 60 * 60 * 1000;
+
+function chatOrphanAttachments(database: Db) {
+  const cutoff = new Date(Date.now() - CHAT_ORPHAN_MS);
+  const rows = database
+    .select({ id: messageAttachments.id })
+    .from(messageAttachments)
+    .where(and(isNull(messageAttachments.messageId), lt(messageAttachments.createdAt, cutoff)))
+    .all();
+  return {
+    count: rows.length,
+    sampleIds: rows.slice(0, SAMPLE_LIMIT).map((row) => row.id),
+  };
+}
+
+function chatDiskMismatch(database: Db) {
+  const cutoff = Date.now() - CHAT_ORPHAN_MS;
+  const rows = database
+    .select({
+      id: messageAttachments.id,
+      messageId: messageAttachments.messageId,
+      path: messageAttachments.path,
+      thumbPath: messageAttachments.thumbPath,
+      status: messageAttachments.status,
+      createdAt: messageAttachments.createdAt,
+    })
+    .from(messageAttachments)
+    .all();
+  const known = new Set<string>();
+  for (const row of rows) {
+    known.add(row.path);
+    if (row.thumbPath) known.add(row.thumbPath);
+  }
+  const root = uploadRoot();
+  const missing: number[] = [];
+  for (const row of rows) {
+    if (row.createdAt.getTime() > cutoff) continue;
+    if (row.messageId == null) continue;
+    const original = path.join(root, row.path);
+    const thumbMissing =
+      row.status === "READY" &&
+      row.thumbPath != null &&
+      !fs.existsSync(path.join(root, row.thumbPath));
+    if (!fs.existsSync(original) || thumbMissing) missing.push(row.id);
+  }
+  const stray: string[] = [];
+  const chatDir = path.join(root, "chat");
+  const walk = (current: string) => {
+    if (!fs.existsSync(current)) return;
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const abs = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(abs);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      const rel = path.relative(root, abs).split(path.sep).join("/");
+      if (known.has(rel)) continue;
+      if (fs.statSync(abs).mtimeMs > cutoff) continue;
+      stray.push(rel);
+    }
+  };
+  walk(chatDir);
+  const detailParts = [
+    missing.length > 0 ? `${toFaDigits(missing.length)} رکورد بدون فایل` : null,
+    stray.length > 0 ? `${toFaDigits(stray.length)} فایل بدون رکورد` : null,
+  ].filter((part): part is string => part != null);
+  if (stray.length > 0) detailParts.push(stray.slice(0, 3).join("، "));
+  return {
+    count: missing.length + stray.length,
+    sampleIds: missing.slice(0, SAMPLE_LIMIT),
+    detail: detailParts.length > 0 ? detailParts.join("؛ ") : undefined,
+  };
+}
+
+function chatInactiveMembers(database: Db) {
+  const rows = database
+    .select({ userId: conversationMembers.userId })
+    .from(conversationMembers)
+    .innerJoin(users, eq(users.id, conversationMembers.userId))
+    .where(
+      and(
+        isNull(conversationMembers.leftAt),
+        or(eq(users.isActive, false), isNotNull(users.deletedAt)),
+      ),
+    )
+    .all();
+  return {
+    count: rows.length,
+    sampleIds: [...new Set(rows.map((row) => row.userId))].slice(0, SAMPLE_LIMIT),
+  };
+}
 
 function mediaJobsAttention(database: Db) {
   const cutoff = new Date(Date.now() - MEDIA_JOB_STUCK_MS);
@@ -659,6 +757,21 @@ const RUNNERS: CheckRunner[] = [
     id: "media_jobs",
     title: "صف رسانه FAILED یا بیش از یک ساعت در PROCESSING",
     run: mediaJobsAttention,
+  },
+  {
+    id: "chat_orphan_attachment",
+    title: "پیوست چت بدون پیام، قدیمی‌تر از ۲۴ ساعت",
+    run: chatOrphanAttachments,
+  },
+  {
+    id: "chat_disk_mismatch",
+    title: "فایل رسانهٔ چت روی دیسک بدون رکورد، یا رکورد بدون فایل",
+    run: chatDiskMismatch,
+  },
+  {
+    id: "chat_inactive_member",
+    title: "عضو فعال گفتگو که کاربرش غیرفعال یا حذف شده",
+    run: chatInactiveMembers,
   },
 ];
 
