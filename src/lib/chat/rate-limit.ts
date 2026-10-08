@@ -13,6 +13,18 @@ export function assertSendRate(userId: number, now = Date.now()): void {
   buckets.set(userId, prev);
 }
 
+const TYPING_MAX = 30;
+const typingBuckets = new Map<number, number[]>();
+
+export function allowTyping(userId: number, now = Date.now()): boolean {
+  const prev = (typingBuckets.get(userId) ?? []).filter((t) => now - t < WINDOW_MS);
+  if (prev.length >= TYPING_MAX) return false;
+  prev.push(now);
+  typingBuckets.set(userId, prev);
+  return true;
+}
+
 export function resetSendRate(): void {
   buckets.clear();
+  typingBuckets.clear();
 }

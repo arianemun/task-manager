@@ -317,6 +317,7 @@ export function editTextMessage(input: {
   if (!body || body.length > CHAT_BODY_MAX) {
     throw new ChatError("متن پیام نامعتبر است");
   }
+  assertSendRate(input.userId, nowMs);
   db.update(messages)
     .set({ body, editedAt: new Date(nowMs) })
     .where(eq(messages.id, row.id))
@@ -335,6 +336,7 @@ export function deleteMessageForEveryone(input: {
   if (!row) throw new ChatError("پیام پیدا نشد");
   assertConversationMember(row.conversationId, input.userId);
   if (row.senderId !== input.userId) throw new ChatError("فقط فرستنده می‌تواند حذف کند");
+  assertSendRate(input.userId, input.now ?? Date.now());
   if (!row.deletedAt) {
     db.update(messages)
       .set({ deletedAt: new Date(input.now ?? Date.now()) })
@@ -736,8 +738,9 @@ export function createGroupConversation(input: {
   memberIds: number[];
 }): number {
   const title = input.title.trim();
-  if (!title) throw new ChatError("نام گروه لازم است");
-  const ids = [...new Set(input.memberIds.filter((id) => id !== input.userId))];
+  if (!title || title.length > 80) throw new ChatError("نام گروه نامعتبر است");
+  const ids = [...new Set(input.memberIds.filter((id) => Number.isInteger(id) && id > 0 && id !== input.userId))];
+  if (ids.length > 100) throw new ChatError("تعداد اعضا زیاد است");
   const created = db
     .insert(conversations)
     .values({

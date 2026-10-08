@@ -8,6 +8,8 @@ import { users } from "@/db/schema";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { verifySessionToken } from "@/lib/auth/jwt";
 import { ChatError } from "@/lib/chat/errors";
+import { allowTyping } from "@/lib/chat/rate-limit";
+import { CHAT_BODY_MAX } from "@/lib/chat/types";
 import {
   activeMemberIds,
   assertConversationMember,
@@ -24,14 +26,14 @@ import { processNextMediaJob } from "@/lib/chat/media-worker";
 
 const sendSchema = z.object({
   conversationId: z.number().int().positive(),
-  body: z.string(),
+  body: z.string().max(CHAT_BODY_MAX),
   clientId: z.string().min(1).max(80),
   replyToId: z.number().int().positive().nullable().optional(),
 });
 
 const editSchema = z.object({
   messageId: z.number().int().positive(),
-  body: z.string(),
+  body: z.string().max(CHAT_BODY_MAX),
 });
 
 const deleteSchema = z.object({
@@ -81,10 +83,28 @@ function sessionStillValid(userId: number, sessionVersion: number): boolean {
   );
 }
 
-function readJson(req: http.IncomingMessage): Promise<unknown> {
+const disconnectSchema = z.object({
+  userId: z.number().int().positive(),
+});
+
+const joinSchema = z.object({
+  conversationId: z.number().int().positive(),
+  userIds: z.array(z.number().int().positive()).max(200),
+});
+
+function readJson(req: http.IncomingMessage, maxBytes = 64 * 1024): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+    let size = 0;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        reject(new Error("too large"));
+        req.destroy();
+        return;
+      }
+      chunks.push(Buffer.from(chunk));
+    });
     req.on("end", () => {
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"));
@@ -138,22 +158,28 @@ export function startRealtimeServer(port: number): http.Server {
       return;
     }
     try {
-      const body = (await readJson(req)) as {
-        userId?: number;
-        conversationId?: number;
-        userIds?: number[];
-      };
+      const body = await readJson(req);
       if (req.url === "/internal/disconnect" && req.method === "POST") {
-        if (body.userId) io.in(`user:${body.userId}`).disconnectSockets(true);
+        const parsed = disconnectSchema.safeParse(body);
+        if (!parsed.success) {
+          res.statusCode = 400;
+          res.end();
+          return;
+        }
+        io.in(`user:${parsed.data.userId}`).disconnectSockets(true);
         res.statusCode = 204;
         res.end();
         return;
       }
       if (req.url === "/internal/join" && req.method === "POST") {
-        if (body.conversationId && Array.isArray(body.userIds)) {
-          for (const userId of body.userIds) {
-            io.in(`user:${userId}`).socketsJoin(`conversation:${body.conversationId}`);
-          }
+        const parsed = joinSchema.safeParse(body);
+        if (!parsed.success) {
+          res.statusCode = 400;
+          res.end();
+          return;
+        }
+        for (const userId of parsed.data.userIds) {
+          io.in(`user:${userId}`).socketsJoin(`conversation:${parsed.data.conversationId}`);
         }
         res.statusCode = 204;
         res.end();
@@ -293,7 +319,7 @@ export function startRealtimeServer(port: number): http.Server {
 
     socket.on("typing", (payload) => {
       const parsed = typingSchema.safeParse(payload);
-      if (!parsed.success) return;
+      if (!parsed.success || !allowTyping(userId)) return;
       try {
         assertConversationMember(parsed.data.conversationId, userId);
         const person = db
