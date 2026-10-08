@@ -78,7 +78,10 @@ export function BulkTaskForm({
       toast.error(state.error || fa.common.taskSaveFailed);
       return;
     }
-    const ids = "taskIds" in state ? state.taskIds : undefined;
+    const ids =
+      "taskIds" in state && Array.isArray(state.taskIds)
+        ? state.taskIds.filter((id): id is number => typeof id === "number")
+        : undefined;
     const count = ids?.length ?? prepared.length;
     toast.success(`${toFaDigits(count)} ${fa.common.taskCreated}`);
     if (ids && ids.length > 0) {
