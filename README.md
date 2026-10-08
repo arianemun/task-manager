@@ -274,6 +274,7 @@ bash /www/wwwroot/task-manager/scripts/cron/generate.sh
 bash /www/wwwroot/task-manager/scripts/cron/close-periods.sh
 bash /www/wwwroot/task-manager/scripts/cron/backup.sh
 bash /www/wwwroot/task-manager/scripts/cron/db-check.sh
+bash /www/wwwroot/task-manager/scripts/cron/chat-media-backup.sh
 echo $?
 tail -n 20 /www/wwwroot/task-manager/logs/db-check-$(TZ=Asia/Tehran date +%F).log
 ```
