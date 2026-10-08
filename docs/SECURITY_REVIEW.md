@@ -37,7 +37,7 @@
 - `X-Frame-Options: DENY`
 - `X-Content-Type-Options: nosniff`
 - `Referrer-Policy: strict-origin-when-cross-origin`
-- `Permissions-Policy`: دوربین/میکروفون/موقعیت خاموش
+- `Permissions-Policy`: میکروفون و دوربین فقط برای همین مبدأ `(self)`؛ موقعیت خاموش
 
 ## ۴. متغیرهای محیطی
 
