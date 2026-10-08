@@ -133,6 +133,16 @@ export const fa = {
     openChat: "باز کردن",
   },
 
+  notifications: {
+    title: "اعلان‌ها",
+    bell: "اعلان‌ها",
+    empty: "اعلانی ندارید",
+    markAll: "خواندن همه",
+    openAll: "همه اعلان‌ها",
+    previous: "قبلی",
+    next: "بعدی",
+  },
+
   status: {
     PENDING: "در انتظار",
     DONE: "انجام شد",

@@ -11,6 +11,7 @@ import {
   users,
 } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
+import { notifyAnnouncement } from "@/lib/notifications/store";
 import { userIdsInDepartments } from "@/lib/departments/membership";
 import { isAuthError } from "@/lib/auth/errors";
 import { requirePermission, requireUser } from "@/lib/auth/user";
@@ -95,6 +96,16 @@ export async function createAnnouncementAction(
       entity: "announcement",
       entityId: row.id,
       meta: { audience: data.audience, isPinned: data.isPinned },
+    });
+
+    notifyAnnouncement({
+      announcementId: row.id,
+      authorId: actor.id,
+      title: data.title,
+      body: data.body,
+      audience: data.audience,
+      departmentId: data.departmentId,
+      userIds: data.userIds,
     });
 
     revalidatePath("/admin/announcements");

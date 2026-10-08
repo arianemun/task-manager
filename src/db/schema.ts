@@ -122,6 +122,9 @@ export const users = sqliteTable(
     })
       .notNull()
       .default(false),
+    /** ساعات سکوت اعلان به وقت تهران، HH:mm. پیش‌فرض ۲۲:۰۰ تا ۰۷:۰۰ */
+    quietHoursStart: text("quiet_hours_start").notNull().default("22:00"),
+    quietHoursEnd: text("quiet_hours_end").notNull().default("07:00"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -626,6 +629,111 @@ export const mediaJobs = sqliteTable(
       .default(sql`(unixepoch() * 1000)`),
   },
   (t) => [index("media_jobs_status_idx").on(t.status)],
+);
+
+export const NOTIFICATION_PRIORITIES = ["LOW", "NORMAL", "HIGH"] as const;
+export type NotificationPriority = (typeof NOTIFICATION_PRIORITIES)[number];
+
+export const NOTIFICATION_TYPES = [
+  "chat.message",
+  "chat.mention",
+  "announcement.new",
+  "task.assigned",
+  "task.daily_digest",
+  "task.due_soon",
+  "task.overdue",
+  "task.manager_summary",
+  "system.data_check_failed",
+] as const;
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+export const NOTIFICATION_CHANNELS = ["PUSH", "SMS", "IN_APP"] as const;
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+
+export const DELIVERY_STATUSES = ["PENDING", "SENT", "FAILED", "SKIPPED"] as const;
+export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
+
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").$type<NotificationType>().notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    url: text("url"),
+    entityType: text("entity_type"),
+    entityId: integer("entity_id"),
+    groupKey: text("group_key"),
+    priority: text("priority")
+      .$type<NotificationPriority>()
+      .notNull()
+      .default("NORMAL"),
+    readAt: integer("read_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [
+    index("notifications_user_created_idx").on(t.userId, t.createdAt),
+    index("notifications_user_read_idx").on(t.userId, t.readAt),
+    index("notifications_group_key_idx").on(t.groupKey),
+  ],
+);
+
+export const notificationDeliveries = sqliteTable(
+  "notification_deliveries",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    notificationId: integer("notification_id")
+      .notNull()
+      .references(() => notifications.id, { onDelete: "cascade" }),
+    channel: text("channel").$type<NotificationChannel>().notNull(),
+    status: text("status").$type<DeliveryStatus>().notNull().default("PENDING"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    sentAt: integer("sent_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("notification_deliveries_notification_idx").on(t.notificationId)],
+);
+
+export const pushSubscriptions = sqliteTable(
+  "push_subscriptions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    deviceLabel: text("device_label"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    lastSuccessAt: integer("last_success_at", { mode: "timestamp_ms" }),
+    failedCount: integer("failed_count").notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex("push_subscriptions_endpoint_unique").on(t.endpoint),
+    index("push_subscriptions_user_id_idx").on(t.userId),
+  ],
+);
+
+export const notificationPreferences = sqliteTable(
+  "notification_preferences",
+  {
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").$type<NotificationType>().notNull(),
+    push: integer("push", { mode: "boolean" }).notNull().default(true),
+    sms: integer("sms", { mode: "boolean" }).notNull().default(false),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.type] })],
 );
 
 export const settings = sqliteTable("settings", {

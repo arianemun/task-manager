@@ -2,18 +2,22 @@
 
 import { PanelRightIcon } from "lucide-react";
 import { AppBreadcrumbs } from "@/components/layout/app-breadcrumbs";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { UserMenu } from "@/components/layout/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import type { Role } from "@/db/schema";
 import { fa } from "@/lib/i18n/fa";
+import type { NotificationItem } from "@/lib/notifications/types";
 import { cn } from "@/lib/utils";
 
 type Props = {
   fullName: string;
   role: Role;
   avatarPath?: string | null;
+  notificationUnread: number;
+  notifications: NotificationItem[];
   /** مخفی کردن تریگر روی موبایل (پرسنل با bottom nav) */
   hideTriggerOnMobile?: boolean;
 };
@@ -22,6 +26,8 @@ export function SiteHeader({
   fullName,
   role,
   avatarPath,
+  notificationUnread,
+  notifications,
   hideTriggerOnMobile = false,
 }: Props) {
   return (
@@ -52,6 +58,7 @@ export function SiteHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        <NotificationBell initialUnread={notificationUnread} initialItems={notifications} />
         <ThemeToggle />
         <UserMenu
           fullName={fullName}

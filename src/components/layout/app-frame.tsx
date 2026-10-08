@@ -12,6 +12,10 @@ import { StaffBottomNav } from "@/components/layout/staff-bottom-nav";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import type { NavItemConfig } from "@/config/nav";
 import type { AuthUser } from "@/lib/auth/user";
+import {
+  countUnreadNotifications,
+  listNotifications,
+} from "@/lib/notifications/store";
 
 type Props = {
   user: AuthUser;
@@ -78,6 +82,8 @@ export async function AppFrame({
           fullName={user.fullName}
           role={user.role}
           avatarPath={user.avatarPath}
+          notificationUnread={countUnreadNotifications(user.id)}
+          notifications={listNotifications(user.id, 1, 15)}
           hideTriggerOnMobile={staffMobile}
         />
 

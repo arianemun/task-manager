@@ -31,3 +31,18 @@ export function requestSocketDisconnect(userId: number): void {
 export function requestSocketJoin(conversationId: number, userIds: number[]): void {
   post("/internal/join", { conversationId, userIds });
 }
+
+export function requestSocketNotify(
+  userId: number,
+  notification: {
+    id: number;
+    type: string;
+    title: string;
+    body: string;
+    url: string | null;
+    priority: "LOW" | "NORMAL" | "HIGH";
+    createdAt: number;
+  },
+): void {
+  post("/internal/notify", { userId, notification });
+}

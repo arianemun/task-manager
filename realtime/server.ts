@@ -10,6 +10,7 @@ import { verifySessionToken } from "@/lib/auth/jwt";
 import { ChatError } from "@/lib/chat/errors";
 import { allowTyping } from "@/lib/chat/rate-limit";
 import { CHAT_BODY_MAX } from "@/lib/chat/types";
+import { socketNotificationSchema } from "@/lib/notifications/types";
 import {
   activeMemberIds,
   assertConversationMember,
@@ -181,6 +182,18 @@ export function startRealtimeServer(port: number): http.Server {
         for (const userId of parsed.data.userIds) {
           io.in(`user:${userId}`).socketsJoin(`conversation:${parsed.data.conversationId}`);
         }
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (path === "/internal/notify" && req.method === "POST") {
+        const parsed = socketNotificationSchema.safeParse(body);
+        if (!parsed.success) {
+          res.statusCode = 400;
+          res.end();
+          return;
+        }
+        io.to(`user:${parsed.data.userId}`).emit("notification:new", parsed.data.notification);
         res.statusCode = 204;
         res.end();
         return;
