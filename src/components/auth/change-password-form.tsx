@@ -18,7 +18,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { fa } from "@/lib/i18n/fa";
 
 const schema = z
@@ -77,9 +77,8 @@ export function ChangePasswordForm() {
             <FormItem>
               <FormLabel>{fa.auth.currentPassword}</FormLabel>
               <FormControl>
-                <Input
+                <PasswordInput
                   {...field}
-                  type="password"
                   autoComplete="current-password"
                   disabled={pending}
                   dir="ltr"
@@ -97,9 +96,8 @@ export function ChangePasswordForm() {
             <FormItem>
               <FormLabel>{fa.auth.newPassword}</FormLabel>
               <FormControl>
-                <Input
+                <PasswordInput
                   {...field}
-                  type="password"
                   autoComplete="new-password"
                   disabled={pending}
                   dir="ltr"
@@ -117,9 +115,8 @@ export function ChangePasswordForm() {
             <FormItem>
               <FormLabel>{fa.auth.confirmPassword}</FormLabel>
               <FormControl>
-                <Input
+                <PasswordInput
                   {...field}
-                  type="password"
                   autoComplete="new-password"
                   disabled={pending}
                   dir="ltr"

@@ -175,13 +175,13 @@ export function listAllDepartments() {
           select user_departments.user_id as member_id
           from user_departments
           inner join users on users.id = user_departments.user_id
-          where user_departments.department_id = ${departments.id}
+          where user_departments.department_id = departments.id
             and ${currentMembershipSql("user_departments")}
             and users.deleted_at is null
           union
           select users.id as member_id
           from users
-          where users.department_id = ${departments.id}
+          where users.department_id = departments.id
             and users.deleted_at is null
             and not exists (
               select 1 from user_departments

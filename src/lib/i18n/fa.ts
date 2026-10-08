@@ -37,6 +37,8 @@ export const fa = {
     logout: "خروج",
     username: "نام کاربری",
     password: "رمز عبور",
+    showPassword: "نمایش رمز",
+    hidePassword: "پنهان کردن رمز",
     changePassword: "تغییر رمز عبور",
     currentPassword: "رمز فعلی",
     newPassword: "رمز جدید",

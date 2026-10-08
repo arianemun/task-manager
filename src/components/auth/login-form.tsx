@@ -16,6 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { fa } from "@/lib/i18n/fa";
 
 const schema = z.object({
@@ -78,9 +79,8 @@ export function LoginForm() {
             <FormItem>
               <FormLabel>{fa.auth.password}</FormLabel>
               <FormControl>
-                <Input
+                <PasswordInput
                   {...field}
-                  type="password"
                   autoComplete="current-password"
                   disabled={pending}
                   dir="ltr"
