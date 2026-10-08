@@ -112,6 +112,16 @@ export const users = sqliteTable(
     failedLoginCount: integer("failed_login_count").notNull().default(0),
     lockedUntil: integer("locked_until", { mode: "timestamp_ms" }),
     lastLoginAt: integer("last_login_at", { mode: "timestamp_ms" }),
+    /** تا این زمان دیالوگ آماده‌سازی دسترسی‌ها نشان داده نشود */
+    permissionsSnoozeUntil: integer("permissions_snooze_until", {
+      mode: "timestamp_ms",
+    }),
+    /** فعال‌سازی همه با getUserMedia موفق بوده؛ دیالوگ خودکار دیگر نیاید */
+    permissionsSetupCompleted: integer("permissions_setup_completed", {
+      mode: "boolean",
+    })
+      .notNull()
+      .default(false),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

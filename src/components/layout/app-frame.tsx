@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
+import { eq } from "drizzle-orm";
 import { ChatNotifier } from "@/components/chat/chat-notifier";
+import { PermissionPrep } from "@/components/permissions/permission-prep";
+import { db } from "@/db";
+import { users } from "@/db/schema";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { PageContainer } from "@/components/layout/page-container";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -31,6 +35,14 @@ export async function AppFrame({
   bleed = false,
   children,
 }: Props) {
+  const snooze = db
+    .select({
+      until: users.permissionsSnoozeUntil,
+      setupCompleted: users.permissionsSetupCompleted,
+    })
+    .from(users)
+    .where(eq(users.id, user.id))
+    .get();
   const jar = await cookies();
   const cookie = jar.get("sidebar_state")?.value;
   const defaultOpen = cookie !== "false";
@@ -57,6 +69,10 @@ export async function AppFrame({
         data-has-bottom-nav={staffMobile ? "" : undefined}
       >
         <ChatNotifier userId={user.id} />
+        <PermissionPrep
+          snoozeUntil={snooze?.until?.getTime() ?? null}
+          setupCompleted={snooze?.setupCompleted ?? false}
+        />
 
         <SiteHeader
           fullName={user.fullName}

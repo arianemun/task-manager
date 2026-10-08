@@ -2,9 +2,17 @@
 
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { Mic } from "lucide-react";
+import { MediaPermissionDrawer } from "@/components/permissions/media-permission-drawer";
 import { fa } from "@/lib/i18n/fa";
 import { CHAT_VOICE_MAX_MS } from "@/lib/chat/types";
 import { voiceGesture, type VoiceGesture } from "@/lib/chat/voice-gesture";
+import { getPermissionStatus, markSessionMedia, sessionMediaGranted } from "@/lib/permissions/browser";
+import {
+  interpretGetUserMedia,
+  isIosUserAgent,
+  shouldCaptureMedia,
+  type PermissionStatus,
+} from "@/lib/permissions/status";
 import { toFaDigits } from "@/lib/utils";
 
 function pickMime(): string {
@@ -44,6 +52,11 @@ export function VoiceHold({
   const limit = useRef<number | null>(null);
   const session = useRef(0);
   const gesture = useRef<VoiceGesture>("recording");
+  const holding = useRef(false);
+  const pressed = useRef(false);
+  const hint = useRef<PermissionStatus>("unknown");
+  const [gate, setGate] = useState<PermissionStatus | null>(null);
+  const [ios, setIos] = useState(false);
 
   function stopTracks() {
     stream.current?.getTracks().forEach((track) => track.stop());
@@ -53,6 +66,7 @@ export function VoiceHold({
   }
 
   function finish(send: boolean) {
+    holding.current = false;
     session.current += 1;
     discard.current = !send;
     const active = recorder.current;
@@ -62,7 +76,17 @@ export function VoiceHold({
     setElapsed(0);
   }
 
-  useEffect(() => () => stopTracks(), []);
+  useEffect(() => {
+    setIos(isIosUserAgent(navigator.userAgent, navigator.platform, navigator.maxTouchPoints));
+    let cancelled = false;
+    void getPermissionStatus("microphone").then((next) => {
+      if (!cancelled && (next === "granted" || next === "denied")) hint.current = next;
+    });
+    return () => {
+      cancelled = true;
+      stopTracks();
+    };
+  }, []);
 
   useEffect(() => {
     if (phase === "idle") return;
@@ -73,13 +97,26 @@ export function VoiceHold({
   async function begin(event: PointerEvent<HTMLButtonElement>) {
     if (phase !== "idle") return;
     event.preventDefault();
+    pressed.current = true;
     onError("");
+    const button = event.currentTarget;
+    const pointerId = event.pointerId;
     const token = session.current + 1;
     session.current = token;
+    if (!shouldCaptureMedia(hint.current, sessionMediaGranted("microphone"))) {
+      setGate("denied");
+      return;
+    }
     try {
       const media = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (session.current !== token) {
+      markSessionMedia("microphone");
+      const outcome = interpretGetUserMedia({
+        ok: true,
+        fingerDown: pressed.current && session.current === token,
+      });
+      if (outcome !== "record") {
         media.getTracks().forEach((track) => track.stop());
+        if (outcome === "hold-again") onError(fa.chat.holdAgain);
         return;
       }
       stream.current = media;
@@ -103,17 +140,31 @@ export function VoiceHold({
         setPhase("idle");
       };
       recorder.current = rec;
+      holding.current = true;
       started.current = Date.now();
       gesture.current = "recording";
       origin.current = { x: event.clientX, y: event.clientY };
       rec.start();
       setPhase("recording");
       setElapsed(0);
-      event.currentTarget.setPointerCapture(event.pointerId);
+      try {
+        button.setPointerCapture(pointerId);
+      } catch {
+        // The system sheet can end the pointer before capture.
+      }
       limit.current = window.setTimeout(() => finish(true), CHAT_VOICE_MAX_MS);
-    } catch {
+    } catch (error) {
       stopTracks();
-      onError(fa.chat.voiceDenied);
+      const name = error instanceof Error ? error.name : "";
+      const outcome = interpretGetUserMedia({ ok: false, errorName: name, fingerDown: pressed.current });
+      if (outcome === "drawer") {
+        hint.current = "denied";
+        setGate("denied");
+      } else if (outcome === "missing") {
+        onError(fa.chat.micMissing);
+      } else {
+        onError(fa.common.error);
+      }
     }
   }
 
@@ -143,22 +194,38 @@ export function VoiceHold({
         onContextMenu={(event) => event.preventDefault()}
         onPointerDown={(event) => void begin(event)}
         onPointerMove={(event) => {
-          if (gesture.current === "lock") return;
+          if (!holding.current || gesture.current === "lock") return;
           const next = voiceGesture(event.clientX - origin.current.x, event.clientY - origin.current.y);
           gesture.current = next;
           setPhase(next === "lock" ? "locked" : next);
           setElapsed(Date.now() - started.current);
         }}
         onPointerUp={() => {
-          if (gesture.current === "lock") return;
+          pressed.current = false;
+          if (!holding.current || gesture.current === "lock") return;
           finish(gesture.current === "recording");
         }}
         onPointerCancel={() => {
-          if (phase !== "locked") finish(false);
+          pressed.current = false;
+          if (holding.current && phase !== "locked") finish(false);
         }}
       >
         <Mic className="size-5" />
       </button>
+      <MediaPermissionDrawer
+        kind="microphone"
+        status={gate ?? "prompt"}
+        ios={ios}
+        open={gate !== null}
+        onOpenChange={(next) => {
+          if (!next) setGate(null);
+        }}
+        onResolved={(next) => {
+          if (next === "granted") hint.current = "granted";
+          if (next === "denied") hint.current = "denied";
+          setGate(next === "granted" ? null : next);
+        }}
+      />
     </div>
   );
 }

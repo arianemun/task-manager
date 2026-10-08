@@ -113,6 +113,20 @@
       "when": 1791370800000,
       "tag": "0015_media_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1791374400000,
+      "tag": "0016_permission_snooze",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1791378000000,
+      "tag": "0017_permission_setup",
+      "breakpoints": true
     }
   ]
 }

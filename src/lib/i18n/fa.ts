@@ -107,6 +107,12 @@ export const fa = {
     voiceCancel: "لغو ضبط",
     voiceTooShort: "ضبط خیلی کوتاه بود",
     voiceDenied: "دسترسی به میکروفون داده نشد",
+    holdAgain: "حالا دوباره نگه دارید",
+    micMissing: "میکروفونی پیدا نشد",
+    cameraMissing: "دوربینی پیدا نشد",
+    voiceNeedsMic: "برای پیام صوتی به میکروفون نیاز است",
+    videoNeedsCamera: "برای ویدیو مسیج به دوربین نیاز است",
+    allowPermission: "اجازه دادن",
     voicePlay: "پخش پیام صوتی",
     direct: "گفتگوی مستقیم",
     group: "گروه",
@@ -200,6 +206,46 @@ export const fa = {
     deviceFirefoxAndroid: "Android، Firefox",
     deviceFirefoxDesktop: "دسکتاپ Firefox",
     deviceOther: "مرورگر دیگر",
+  },
+
+  permissions: {
+    title: "آماده‌سازی برنامه",
+    description: "اجازه‌ها یک‌جا گرفته می‌شود تا وسط ضبط پرسیده نشود.",
+    section: "دسترسی‌ها",
+    enableAll: "فعال‌سازی همه",
+    later: "بعداً",
+    requestAgain: "درخواست دوباره",
+    notifications: "اعلان‌ها",
+    notificationsHint: "برای خبر کار و پیام",
+    microphone: "میکروفون",
+    microphoneHint: "برای پیام صوتی",
+    camera: "دوربین",
+    cameraHint: "برای ویدیو مسیج",
+    granted: "اجازه داده شده",
+    prompt: "نیاز به اجازه",
+    denied: "رد شده",
+    unknown: "نامشخص",
+    askOnUse: "هنگام استفاده پرسیده می‌شود",
+    askOnUseHint: "در آیفون ممکن است پس از بستن برنامه دوباره اجازه بخواهد",
+    deniedWarning: "یک دسترسی رد شده است. از راهنمای همان ردیف آن را دستی روشن کنید.",
+    iosInstall:
+      "برای دریافت اعلان، اپ را نصب کنید: Share، بعد Add to Home Screen، و Open as Web App را روشن بگذارید. با VPN روشن اپ باز نمی‌شود؛ در اپ VPN دامنهٔ task.khanemadari.com یا سایت‌های ایرانی را مستثنا کنید.",
+    deniedIos: {
+      notifications:
+        "مرورگر دوباره نمی‌پرسد. در iPhone بروید به Settings ← نام اپ یا Safari ← Notifications.",
+      microphone:
+        "مرورگر دوباره نمی‌پرسد. در iPhone بروید به Settings ← نام اپ یا Safari ← Microphone.",
+      camera:
+        "مرورگر دوباره نمی‌پرسد. در iPhone بروید به Settings ← نام اپ یا Safari ← Camera.",
+    },
+    deniedOther: {
+      notifications:
+        "مرورگر دوباره نمی‌پرسد. در Android Chrome آیکن قفل کنار آدرس را بزنید، یا Site settings را باز کنید، و Notifications را Allow کنید.",
+      microphone:
+        "مرورگر دوباره نمی‌پرسد. در Android Chrome آیکن قفل کنار آدرس را بزنید، یا Site settings را باز کنید، و Microphone را Allow کنید.",
+      camera:
+        "مرورگر دوباره نمی‌پرسد. در Android Chrome آیکن قفل کنار آدرس را بزنید، یا Site settings را باز کنید، و Camera را Allow کنید.",
+    },
   },
 
   about: {

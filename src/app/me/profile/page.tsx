@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppCredit } from "@/components/layout/app-credit";
 import { AvatarForm } from "@/components/me/avatar-form";
 import { ChangePasswordDialog } from "@/components/me/change-password-dialog";
+import { PermissionSettings } from "@/components/permissions/permission-settings";
 import { PageHeader } from "@/components/layout/page-header";
 import { Stack } from "@/components/layout/stack";
 import {
@@ -65,6 +66,16 @@ export default async function MeProfilePage() {
               </span>
             ) : null}
           </Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{fa.permissions.section}</CardTitle>
+          <CardDescription>{fa.permissions.description}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PermissionSettings />
         </CardContent>
       </Card>
 
