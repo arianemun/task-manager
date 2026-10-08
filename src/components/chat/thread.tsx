@@ -639,7 +639,7 @@ export function ChatThread({
         </DrawerContent>
       </Drawer>
       <form
-        className="chat-composer chat-pad-x border-t pt-2"
+        className="chat-composer chat-pad-x relative border-t pt-2"
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit();
