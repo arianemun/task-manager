@@ -113,11 +113,20 @@ pm2 startup
 
 متغیرهای env را یا در `.env` ریشه (و لود توسط اپ) یا در بخش `env`ی `ecosystem.config.js` بگذارید. `TZ=Asia/Tehran` ضروری است.
 
-گفتگوی زنده یک پروسهٔ جداست (`task-manager-realtime` در همان فایل PM2). حالت اجرا `fork` و یک instance است. حافظهٔ Socket.IO داخل همین پروسه می‌ماند؛ اگر بعداً چند instance شود باید adapter جدا (مثلاً Redis) اضافه شود. Web Push در این مرحله نیست.
+`ecosystem.config.js` دو اپ دارد:
 
-nginx باید `/socket.io/` را به پورت داخلی realtime (پیش‌فرض ۳۲۳۱) بفرستد. برای ویدیوی چت، `client_max_body_size` حداقل ۱۱۰ مگابایت باشد و `location /api/files/` هدر `Range` را به Next برساند و `proxy_buffering` آن خاموش باشد:
+| نام PM2 | چه چیزی | پورت |
+|---|---|---|
+| `task-manager` | Next، از `.next/standalone/server.js` | `PORT` ۳۲۳۰ |
+| `task-manager-realtime` | `tsx realtime/server.ts` | `REALTIME_PORT` ۳۲۳۱ |
+
+هر دو `fork` و یک instance هستند و با کاربر `www` اجرا می‌شوند. حافظهٔ Socket.IO داخل پروسهٔ realtime می‌ماند؛ اگر بعداً چند instance شود باید adapter جدا (مثلاً Redis) اضافه شود. Web Push در این نسخه نیست.
+
+nginx سایت را به پورت Next می‌فرستد و `/socket.io/` را جدا به realtime. برای آپلود چت `client_max_body_size` حداقل ۱۱۰ مگابایت است. `location /api/files/` هدر `Range` را عبور می‌دهد و `proxy_buffering` خاموش است:
 
 ```nginx
+client_max_body_size 110m;
+
 location /socket.io/ {
     proxy_pass http://127.0.0.1:3231;
     proxy_http_version 1.1;
@@ -128,11 +137,35 @@ location /socket.io/ {
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_read_timeout 86400s;
 }
+
+location /api/chat/media {
+    client_max_body_size 110m;
+    proxy_pass http://127.0.0.1:3230;
+    proxy_request_buffering off;
+}
+
+location /api/files/ {
+    proxy_pass http://127.0.0.1:3230;
+    proxy_buffering off;
+    proxy_set_header Range $http_range;
+    proxy_set_header If-Range $http_if_range;
+}
 ```
 
-پیام صوتی با ffmpeg به AAC داخل M4A تبدیل می‌شود و متادیتا حذف می‌گردد. عکس HEIC با `heif-convert` از بستهٔ `libheif-examples` به JPEG تبدیل می‌شود، بعد همان محدودیت ابعاد و حذف EXIF بقیهٔ عکس‌ها روی آن اجرا می‌شود. نصب: `sudo apt-get install -y libheif-examples libheif-plugin-libde265`. رمزگشای HEVC برای عکس آیفون لازم است. اگر باینری جای دیگری است، `HEIC_CONVERT_BIN` را در env بگذارید؛ پیش‌فرض `heif-convert` از PATH است.
+روی سرور `ffmpeg` و `ffprobe` و `heif-convert` لازم است. پیام صوتی با ffmpeg به AAC داخل M4A تبدیل می‌شود و متادیتا حذف می‌گردد. عکس HEIC با `heif-convert` از بستهٔ `libheif-examples` به JPEG تبدیل می‌شود، بعد همان محدودیت ابعاد و حذف EXIF بقیهٔ عکس‌ها روی آن اجرا می‌شود. نصب: `sudo apt-get install -y ffmpeg libheif-examples libheif-plugin-libde265`. رمزگشای HEVC برای عکس آیفون لازم است.
 
-هر دو پروسه همان فایل SQLite را با WAL و `busy_timeout` حداقل ۵ ثانیه باز می‌کنند. `INTERNAL_SECRET` را در `.env` بگذارید تا Next بتواند سوکت کاربر را بعد از غیرفعال‌سازی یا ریست رمز قطع کند. `APP_ORIGIN` مبدأ مجاز مرورگر است. اتصال مرورگر به همان میزبان است؛ `connect-src 'self'` شامل `wss` همان میزبان می‌شود.
+متغیرهای چت در `.env` (نمونه در `.env.example`):
+
+| متغیر | نقش |
+|---|---|
+| `REALTIME_PORT` | پورت پروسهٔ سوکت؛ پیش‌فرض ۳۲۳۱ |
+| `INTERNAL_SECRET` | راز `Bearer` برای قطع سوکت و join اتاق از طرف Next |
+| `APP_ORIGIN` | مبدأ مجاز CORS سوکت؛ در استقرار آدرس https سایت |
+| `FFMPEG_BIN` | مسیر ffmpeg؛ پیش‌فرض `ffmpeg` |
+| `FFPROBE_BIN` | مسیر ffprobe؛ پیش‌فرض `ffprobe` |
+| `HEIC_CONVERT_BIN` | مسیر heif-convert؛ پیش‌فرض `heif-convert` |
+
+هر دو پروسه همان فایل SQLite را با WAL و `busy_timeout` حداقل ۵ ثانیه باز می‌کنند. `INTERNAL_SECRET` باید در هر دو پروسه یکی باشد تا Next بتواند سوکت کاربر را بعد از غیرفعال‌سازی یا ریست رمز قطع کند. اتصال مرورگر به همان میزبان است؛ `connect-src 'self'` شامل `wss` همان میزبان می‌شود.
 
 اجرای مستقیم standalone:
 
@@ -167,6 +200,7 @@ bash /www/wwwroot/task-manager/scripts/cron/generate.sh
 bash /www/wwwroot/task-manager/scripts/cron/close-periods.sh
 bash /www/wwwroot/task-manager/scripts/cron/backup.sh
 bash /www/wwwroot/task-manager/scripts/cron/db-check.sh
+bash /www/wwwroot/task-manager/scripts/cron/chat-media-backup.sh
 ```
 
 زمان‌بندی به وقت تهران:
@@ -177,8 +211,9 @@ bash /www/wwwroot/task-manager/scripts/cron/db-check.sh
 | close-periods | ۰۰:۱۵ | `bash /www/wwwroot/task-manager/scripts/cron/close-periods.sh` |
 | backup | ۰۲:۰۰ | `bash /www/wwwroot/task-manager/scripts/cron/backup.sh` |
 | db-check | ۰۲:۲۵ | `bash /www/wwwroot/task-manager/scripts/cron/db-check.sh` |
+| بکاپ افزایشی رسانهٔ چت | یکشنبه ۰۳:۳۰ | `bash /www/wwwroot/task-manager/scripts/cron/chat-media-backup.sh` |
 
-نصب یا به‌روزرسانی همین چهار خط در crontab کاربر `www`، داخل بلوک `# BEGIN task-manager` تا `# END task-manager`:
+نصب یا به‌روزرسانی همین خط‌ها در crontab کاربر `www`، داخل بلوک `# BEGIN task-manager` تا `# END task-manager`:
 
 ```bash
 sudo bash /www/wwwroot/task-manager/scripts/cron/install.sh
@@ -207,6 +242,7 @@ sudo timedatectl set-timezone Asia/Tehran
 | ۰۰:۱۵ close-periods | ۲۰:۴۵ روز قبل |
 | ۰۲:۰۰ backup | ۲۲:۳۰ روز قبل |
 | ۰۲:۲۵ db-check | ۲۲:۵۵ روز قبل |
+| یکشنبه ۰۳:۳۰ رسانهٔ چت | یکشنبه ۰۰:۰۰ |
 
 مهر زمان داخل لاگ‌ها با `TZ=Asia/Tehran` نوشته می‌شود، حتی اگر ساعت Cron روی UTC باشد.
 
@@ -255,8 +291,9 @@ npm run db:backup
 ```
 
 - خروجی: `BACKUP_DIR/app_<تاریخ‌شمسی>_<timestamp>.db`
-- zip پوشه آپلودها: `uploads_<...>.zip`
+- zip پوشهٔ آپلودها به‌جز `chat/`: `uploads_<...>.zip`
 - نگهداری خودکار **۱۴** نسخه آخر
+- رسانهٔ چت جدا و افزایشی است: `npm run` ندارد؛ `scripts/chat-media-backup.ts` با rsync (یا کپی فقط فایل‌های تازه) به `BACKUP_DIR/chat-media` می‌نویسد. Cron هفتگی یکشنبه ۰۳:۳۰ آن را اجرا می‌کند. حجم فعلی همین فایل‌ها در تب «سلامت داده» تنظیمات دیده می‌شود.
 
 بازیابی:
 
