@@ -19,6 +19,7 @@ export type TaskListFilters = {
   status?: "active" | "archived" | "all";
   departmentId?: number | null;
   departmentIds?: number[];
+  ids?: number[];
 };
 
 export function listTasksForActor(actor: AuthUser, filters: TaskListFilters = {}) {
@@ -27,7 +28,13 @@ export function listTasksForActor(actor: AuthUser, filters: TaskListFilters = {}
     return [];
   }
 
-  const conditions: SQL[] = [inArray(taskTemplates.id, visible)];
+  const idFilter = (filters.ids ?? []).filter((id) => visible.includes(id));
+  if (filters.ids && filters.ids.length > 0 && idFilter.length === 0) {
+    return [];
+  }
+  const conditions: SQL[] = [
+    inArray(taskTemplates.id, idFilter.length > 0 ? idFilter : visible),
+  ];
 
   if (filters.status === "archived") {
     conditions.push(eq(taskTemplates.isActive, false));

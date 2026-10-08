@@ -9,6 +9,8 @@ import {
   taskTemplates,
 } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
+import { changedFields } from "@/lib/audit-diff";
+import { prepareBulkTitles } from "@/lib/tasks/bulk-titles";
 import { activeMembersOfDepartment } from "@/lib/departments/membership";
 import { isAuthError } from "@/lib/auth/errors";
 import { requirePermission, requireUser } from "@/lib/auth/user";
@@ -16,7 +18,7 @@ import {
   assertAssigneeInScope,
   assertCanEditTemplate,
 } from "@/lib/scope/tasks";
-import { taskFormSchema } from "@/lib/validation/task";
+import { taskFormSchema, type TaskFormInput } from "@/lib/validation/task";
 import {
   generateForTemplate,
   removePendingOnUnassign,
@@ -65,6 +67,54 @@ function saveFailed(error: unknown): { ok: false; error: string } {
   if (isAuthError(error)) return { ok: false, error: error.message };
   console.error(error);
   return { ok: false, error: "ذخیره کار انجام نشد" };
+}
+
+const TASK_AUDIT_FIELDS = [
+  "title",
+  "description",
+  "categoryId",
+  "priority",
+  "recurrenceType",
+  "recurrenceConfig",
+  "startDate",
+  "endDate",
+  "dueTime",
+  "completionMode",
+  "userIds",
+  "departmentIds",
+] as const;
+
+function taskAuditRecord(data: TaskFormInput) {
+  return {
+    title: data.title,
+    description: data.description || null,
+    categoryId: data.categoryId ?? null,
+    priority: data.priority,
+    recurrenceType: data.recurrenceType,
+    recurrenceConfig: data.recurrenceConfig,
+    startDate: data.startDate,
+    endDate: data.endDate || null,
+    dueTime: data.dueTime || null,
+    completionMode: data.completionMode,
+    userIds: data.userIds,
+    departmentIds: data.departmentIds,
+  };
+}
+
+function currentAssignees(templateId: number) {
+  const existing = db
+    .select()
+    .from(taskAssignments)
+    .where(eq(taskAssignments.templateId, templateId))
+    .all();
+  return {
+    userIds: existing
+      .filter((row) => row.assigneeType === "USER" && row.userId)
+      .map((row) => row.userId!),
+    departmentIds: existing
+      .filter((row) => row.assigneeType === "DEPARTMENT" && row.departmentId)
+      .map((row) => row.departmentId!),
+  };
 }
 
 function syncAssignments(
@@ -161,7 +211,7 @@ export async function createTaskAction(
       action: "task.create",
       entity: "task_template",
       entityId: row.id,
-      meta: { title: data.title, recurrenceType: data.recurrenceType },
+      meta: { snapshot: taskAuditRecord(data) },
     });
 
     revalidateTaskSurfaces(row.id);
@@ -200,6 +250,7 @@ export async function updateTaskAction(
     }
     assertAssigneeInScope(actor, data.userIds, data.departmentIds);
 
+    const beforeAssignees = currentAssignees(id);
     const recurrenceChanged =
       existing.recurrenceType !== data.recurrenceType ||
       JSON.stringify(existing.recurrenceConfig) !==
@@ -233,7 +284,24 @@ export async function updateTaskAction(
       action: "task.update",
       entity: "task_template",
       entityId: id,
-      meta: { recurrenceChanged },
+      meta: changedFields(
+        {
+          title: existing.title,
+          description: existing.description,
+          categoryId: existing.categoryId,
+          priority: existing.priority,
+          recurrenceType: existing.recurrenceType,
+          recurrenceConfig: existing.recurrenceConfig,
+          startDate: existing.startDate,
+          endDate: existing.endDate,
+          dueTime: existing.dueTime,
+          completionMode: existing.completionMode,
+          userIds: beforeAssignees.userIds,
+          departmentIds: beforeAssignees.departmentIds,
+        },
+        taskAuditRecord(data),
+        TASK_AUDIT_FIELDS,
+      ),
     });
 
     revalidateTaskSurfaces(id);
@@ -329,6 +397,90 @@ export async function activateTaskAction(
   } catch (e) {
     if (isAuthError(e)) return { ok: false, error: e.message };
     throw e;
+  }
+}
+
+const BULK_TITLE_LIMIT = 200;
+
+export async function bulkCreateTasksAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult & { taskIds?: number[] }> {
+  try {
+    const actor = await requirePermission("tasks.create");
+    const prepared = prepareBulkTitles(String(formData.get("titles") ?? ""));
+    if (prepared.length === 0) {
+      return { ok: false, error: "حداقل یک عنوان لازم است" };
+    }
+    if (prepared.length > BULK_TITLE_LIMIT) {
+      return { ok: false, error: "در هر بار حداکثر ۲۰۰ عنوان می‌توان ساخت" };
+    }
+
+    if (!String(formData.get("title") ?? "").trim()) {
+      formData.set("title", prepared[0]!.title);
+    }
+    const parsed = parseTaskForm(formData);
+    if (!parsed.success) {
+      const issue = parsed.error.issues.find((item) => item.path[0] !== "title");
+      return { ok: false, error: issue?.message ?? parsed.error.issues[0]?.message ?? "نامعتبر" };
+    }
+    const shared = parsed.data;
+    if (actor.role === "MANAGER") {
+      shared.departmentIds = shared.departmentIds.filter((id) =>
+        actor.departmentIds.includes(id),
+      );
+    }
+    assertAssigneeInScope(actor, shared.userIds, shared.departmentIds);
+
+    const ids: number[] = [];
+    db.transaction(() => {
+      for (const item of prepared) {
+        const data = { ...shared, title: item.title };
+        const row = db
+          .insert(taskTemplates)
+          .values({
+            title: data.title,
+            description: data.description || null,
+            categoryId: data.categoryId ?? null,
+            priority: data.priority,
+            requiresNote: data.requiresNote,
+            requiresAttachment: data.requiresAttachment,
+            skipHolidays: data.skipHolidays,
+            completionMode: data.completionMode,
+            recurrenceType: data.recurrenceType,
+            recurrenceConfig: data.recurrenceConfig,
+            startDate: data.startDate,
+            endDate: data.endDate || null,
+            dueTime: data.dueTime || null,
+            isActive: true,
+            createdBy: actor.id,
+          })
+          .returning({ id: taskTemplates.id })
+          .get();
+        syncAssignments(row.id, data.userIds, data.departmentIds);
+        generateForTemplate(row.id);
+        writeAuditLog({
+          actorId: actor.id,
+          action: "task.create",
+          entity: "task_template",
+          entityId: row.id,
+          meta: { snapshot: taskAuditRecord(data) },
+        });
+        ids.push(row.id);
+      }
+      writeAuditLog({
+        actorId: actor.id,
+        action: "task.bulk_create",
+        entity: "task_template",
+        entityId: null,
+        meta: { ids },
+      });
+    });
+
+    revalidateTaskSurfaces();
+    return { ok: true, taskIds: ids };
+  } catch (e) {
+    return saveFailed(e);
   }
 }
 

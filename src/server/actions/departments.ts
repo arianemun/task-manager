@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { departments, userDepartments, users } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
+import { changedFields } from "@/lib/audit-diff";
 import { currentMembershipSql } from "@/lib/departments/membership";
 import { isAuthError } from "@/lib/auth/errors";
 import { requirePermission, requireUser } from "@/lib/auth/user";
@@ -49,7 +50,12 @@ export async function createDepartmentAction(
       action: "department.create",
       entity: "department",
       entityId: row.id,
-      meta: { name: parsed.data.name },
+      meta: {
+        snapshot: {
+          name: parsed.data.name.trim(),
+          managerId: parsed.data.managerId ?? null,
+        },
+      },
     });
 
     revalidatePath("/admin/departments");
@@ -80,11 +86,19 @@ export async function updateDepartmentAction(
       return { ok: false, error: "ورودی نامعتبر است" };
     }
 
+    const current = db
+      .select()
+      .from(departments)
+      .where(eq(departments.id, id))
+      .get();
+    if (!current) return { ok: false, error: "دپارتمان پیدا نشد" };
+
+    const next = {
+      name: parsed.data.name.trim(),
+      managerId: parsed.data.managerId ?? null,
+    };
     db.update(departments)
-      .set({
-        name: parsed.data.name.trim(),
-        managerId: parsed.data.managerId ?? null,
-      })
+      .set(next)
       .where(eq(departments.id, id))
       .run();
 
@@ -93,7 +107,11 @@ export async function updateDepartmentAction(
       action: "department.update",
       entity: "department",
       entityId: id,
-      meta: { name: parsed.data.name },
+      meta: changedFields(
+        { name: current.name, managerId: current.managerId },
+        next,
+        ["name", "managerId"],
+      ),
     });
 
     revalidatePath("/admin/departments");

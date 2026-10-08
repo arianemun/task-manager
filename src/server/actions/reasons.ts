@@ -11,6 +11,7 @@ import {
   taskOccurrences,
 } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
+import { changedFields } from "@/lib/audit-diff";
 import { isAuthError } from "@/lib/auth/errors";
 import { requirePermission } from "@/lib/auth/user";
 import { ensureNotDoneReasonsSeeded } from "@/lib/settings/not-done-reasons";
@@ -102,8 +103,10 @@ export async function createReasonAction(
       entity: "not_done_reason",
       entityId: row.id,
       meta: {
-        label: parsed.data.label,
-        departmentIds: parsed.data.departmentIds,
+        snapshot: {
+          label: parsed.data.label,
+          departmentIds: parsed.data.departmentIds,
+        },
       },
     });
     revalidateReasonViews();
@@ -153,6 +156,13 @@ export async function updateReasonAction(
       return { ok: false, error: "دلیلی با این عنوان وجود دارد" };
     }
 
+    const previousDepartments = db
+      .select({ departmentId: notDoneReasonDepartments.departmentId })
+      .from(notDoneReasonDepartments)
+      .where(eq(notDoneReasonDepartments.reasonId, id))
+      .all()
+      .map((row) => row.departmentId);
+
     db.transaction((tx) => {
       tx.update(notDoneReasons)
         .set({ label: parsed.data.label })
@@ -178,10 +188,14 @@ export async function updateReasonAction(
       action: "reason.update",
       entity: "not_done_reason",
       entityId: id,
-      meta: {
-        label: parsed.data.label,
-        departmentIds: parsed.data.departmentIds,
-      },
+      meta: changedFields(
+        { label: current.label, departmentIds: previousDepartments },
+        {
+          label: parsed.data.label,
+          departmentIds: parsed.data.departmentIds,
+        },
+        ["label", "departmentIds"],
+      ),
     });
     revalidateReasonViews();
     return { ok: true };

@@ -248,6 +248,7 @@ export const PATH_LABELS: Record<string, string> = {
   profile: fa.nav.profile,
   chat: fa.nav.chat,
   new: "جدید",
+  bulk: fa.common.bulkAddTasks,
   login: fa.auth.login,
   "change-password": fa.auth.changePassword,
 };

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
+import { viewAuditMeta } from "@/lib/audit-diff";
 import { fa } from "@/lib/i18n/fa";
 import { toFaDigits } from "@/lib/utils";
 
@@ -33,12 +34,30 @@ type Props = {
   staff: Array<{ id: number; fullName: string }>;
 };
 
+function fieldLabel(field: string): string {
+  return fa.auditFields[field as keyof typeof fa.auditFields] ?? field;
+}
+
+function formatAuditValue(value: unknown): string {
+  if (value == null || value === "") return "—";
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "—";
+    return value.map((item) => formatAuditValue(item)).join("، ");
+  }
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
 function MetaCollapsible({ meta }: { meta: unknown }) {
-  if (meta == null) {
+  const view = viewAuditMeta(meta);
+  if (
+    view.raw == null &&
+    view.changes.length === 0 &&
+    view.snapshot.length === 0 &&
+    !view.extra
+  ) {
     return <span className="text-muted-foreground">—</span>;
   }
-  const text =
-    typeof meta === "string" ? meta : JSON.stringify(meta, null, 2);
   return (
     <Collapsible>
       <CollapsibleTrigger asChild>
@@ -49,17 +68,46 @@ function MetaCollapsible({ meta }: { meta: unknown }) {
           className="group h-auto gap-1 px-2 py-1 text-xs"
           aria-label="نمایش جزئیات"
         >
-          جزئیات
+          {fa.auditFields.details}
           <ChevronDown className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <pre
-          className="bg-muted/50 mt-1 max-h-40 overflow-auto rounded-md p-2 text-start text-xs whitespace-pre-wrap"
-          dir="ltr"
-        >
-          {text}
-        </pre>
+        <div className="bg-muted/50 mt-1 max-h-48 space-y-2 overflow-auto rounded-md p-2 text-xs">
+          {view.snapshot.length > 0 ? (
+            <div className="space-y-1">
+              <p className="font-medium">{fa.auditFields.snapshot}</p>
+              {view.snapshot.map((row) => (
+                <p key={row.field}>
+                  <span className="text-muted-foreground">{fieldLabel(row.field)}: </span>
+                  {formatAuditValue(row.value)}
+                </p>
+              ))}
+            </div>
+          ) : null}
+          {view.changes.length > 0 ? (
+            <div className="space-y-1">
+              {view.changes.map((row) => (
+                <p key={row.field}>
+                  <span className="text-muted-foreground">{fieldLabel(row.field)}: </span>
+                  {formatAuditValue(row.from)} ← {formatAuditValue(row.to)}
+                </p>
+              ))}
+            </div>
+          ) : view.snapshot.length === 0 && !view.extra && !view.raw ? (
+            <p>{fa.auditFields.noFieldChange}</p>
+          ) : null}
+          {view.extra ? (
+            <pre className="text-start whitespace-pre-wrap" dir="ltr">
+              {JSON.stringify(view.extra, null, 2)}
+            </pre>
+          ) : null}
+          {view.raw ? (
+            <pre className="text-start whitespace-pre-wrap" dir="ltr">
+              {view.raw}
+            </pre>
+          ) : null}
+        </div>
       </CollapsibleContent>
     </Collapsible>
   );

@@ -207,10 +207,10 @@ function auditMembership(
       action: input.action,
       entity: "user",
       entityId: String(input.userId),
-      meta: {
-        departmentId: input.departmentId,
-        at: input.at,
-      },
+      meta:
+        input.action === "department.join"
+          ? { departmentId: { from: null, to: input.departmentId } }
+          : { departmentId: { from: input.departmentId, to: null } },
     })
     .run();
 }

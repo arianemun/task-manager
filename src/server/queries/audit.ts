@@ -18,6 +18,7 @@ export const AUDIT_ACTION_WHITELIST = [
   "staff.update",
   "staff.avatar",
   "task.create",
+  "task.bulk_create",
   "task.update",
   "task.archive",
   "task.activate",

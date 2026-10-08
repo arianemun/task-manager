@@ -20,6 +20,7 @@ type Props = {
     recurrenceType?: string;
     status?: string;
     departmentId?: string;
+    ids?: string;
   }>;
 };
 
@@ -43,6 +44,12 @@ export default async function TasksPage({ searchParams }: Props) {
     recurrenceType: sp.recurrenceType || null,
     status: (sp.status as "active" | "archived" | "all") || "active",
     departmentId: sp.departmentId ? Number(sp.departmentId) : null,
+    ids: sp.ids
+      ? sp.ids
+          .split(",")
+          .map((part) => Number(part))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      : undefined,
   });
 
   const tableRows = rows.map((row) => ({
@@ -61,12 +68,17 @@ export default async function TasksPage({ searchParams }: Props) {
         title={fa.nav.tasks}
         description="تعریف الگوهای تکرار و اساین به پرسنل / دپارتمان"
         primaryAction={
-          <Button asChild>
-            <Link href="/admin/tasks/new">
-              <Plus className="size-4" />
-              کار جدید
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link href="/admin/tasks/bulk">{fa.common.bulkAddTasks}</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/admin/tasks/new">
+                <Plus className="size-4" />
+                کار جدید
+              </Link>
+            </Button>
+          </div>
         }
       />
 

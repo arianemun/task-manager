@@ -14,6 +14,7 @@ import {
   type Role,
 } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
+import { changedFields } from "@/lib/audit-diff";
 import { isAuthError } from "@/lib/auth/errors";
 import { hashPassword } from "@/lib/auth/password";
 import {
@@ -234,10 +235,18 @@ export async function createStaffAction(
       entity: "user",
       entityId: row.id,
       meta: {
-        username: data.username,
-        role: data.role,
-        departmentIds,
-        permissions: perms,
+        snapshot: {
+          username: data.username,
+          fullName: data.fullName,
+          nationalCode: data.nationalCode || null,
+          phone: data.phone || null,
+          email: data.email || null,
+          position: data.position || null,
+          role: data.role,
+          hireDate: data.hireDate || null,
+          departmentIds,
+          permissions: perms,
+        },
       },
     });
 
@@ -335,12 +344,38 @@ export async function updateStaffAction(
       action: "staff.update",
       entity: "user",
       entityId: id,
-      meta: {
-        role: newRole,
-        departmentIds,
-        departmentChanged:
-          previousIds.join(",") !== departmentIds.join(","),
-      },
+      meta: changedFields(
+        {
+          fullName: target.fullName,
+          nationalCode: target.nationalCode,
+          phone: target.phone,
+          email: target.email,
+          position: target.position,
+          role: target.role,
+          hireDate: target.hireDate,
+          departmentIds: previousIds,
+        },
+        {
+          fullName: data.fullName,
+          nationalCode: data.nationalCode || null,
+          phone: data.phone || null,
+          email: data.email || null,
+          position: data.position || null,
+          role: newRole,
+          hireDate: data.hireDate || null,
+          departmentIds,
+        },
+        [
+          "fullName",
+          "nationalCode",
+          "phone",
+          "email",
+          "position",
+          "role",
+          "hireDate",
+          "departmentIds",
+        ],
+      ),
     });
 
     revalidatePath("/admin/staff");
@@ -369,6 +404,12 @@ export async function setStaffPermissionsAction(
     assertCanModifyPermissions(actor, id);
 
     const perms = parsePermissions(formData);
+    const previousPerms = db
+      .select({ permission: userPermissions.permission })
+      .from(userPermissions)
+      .where(eq(userPermissions.userId, id))
+      .all()
+      .map((row) => row.permission);
     db.delete(userPermissions).where(eq(userPermissions.userId, id)).run();
     for (const permission of perms) {
       db.insert(userPermissions)
@@ -381,7 +422,11 @@ export async function setStaffPermissionsAction(
       action: "staff.permissions",
       entity: "user",
       entityId: id,
-      meta: { permissions: perms },
+      meta: changedFields(
+        { permissions: previousPerms },
+        { permissions: perms },
+        ["permissions"],
+      ),
     });
 
     revalidatePath(`/admin/staff/${id}`);

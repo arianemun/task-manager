@@ -95,7 +95,16 @@ export async function createAnnouncementAction(
       action: "announcement.create",
       entity: "announcement",
       entityId: row.id,
-      meta: { audience: data.audience, isPinned: data.isPinned },
+      meta: {
+        snapshot: {
+          title: data.title,
+          body: data.body,
+          audience: data.audience,
+          departmentId: data.departmentId ?? null,
+          isPinned: Boolean(data.isPinned),
+          userIds: data.userIds ?? [],
+        },
+      },
     });
 
     notifyAnnouncement({
