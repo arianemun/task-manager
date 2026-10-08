@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireUserOrRedirect } from "@/lib/auth/redirect";
+import { chatMediaDiskUsage, formatByteSize } from "@/lib/chat/media-size";
 import {
   formatTehranDateTime,
   loadLastHealthReport,
@@ -32,6 +33,7 @@ export default async function AdminSettingsPage({
       ? params.tab
       : "reasons";
   const health = loadLastHealthReport();
+  const chatMedia = chatMediaDiskUsage();
 
   return (
     <Stack>
@@ -76,6 +78,10 @@ export default async function AdminSettingsPage({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-sm leading-[1.7]">
+              <p>
+                حجم کل رسانهٔ چت: {formatByteSize(chatMedia.bytes)} در{" "}
+                {toFaDigits(chatMedia.files)} فایل
+              </p>
               <form action={rerunDataHealthCheckAction}>
                 <RerunHealthButton />
               </form>

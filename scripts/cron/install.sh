@@ -25,6 +25,7 @@ ${begin}
 15 0 * * * bash ${root}/scripts/cron/close-periods.sh
 0 2 * * * bash ${root}/scripts/cron/backup.sh
 25 2 * * * bash ${root}/scripts/cron/db-check.sh
+30 3 * * 0 bash ${root}/scripts/cron/chat-media-backup.sh
 ${end}
 EOF
 )"

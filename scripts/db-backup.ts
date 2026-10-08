@@ -7,6 +7,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import Database from "better-sqlite3";
+import { UPLOAD_ZIP_EXCLUDES } from "@/lib/backup/uploads";
+import { chatMediaDiskUsage, formatByteSize } from "@/lib/chat/media-size";
 import { toJalali, todayTehran } from "@/lib/dates";
 
 function resolvePath(envVal: string | undefined, fallback: string): string {
@@ -54,12 +56,12 @@ async function main() {
           [
             "-NoProfile",
             "-Command",
-            `Compress-Archive -Path '${uploadDir}\\*' -DestinationPath '${zipPath}' -Force`,
+            `$items = Get-ChildItem -Force -LiteralPath '${uploadDir}' | Where-Object { $_.Name -ne 'chat' } | ForEach-Object { $_.FullName }; if ($items) { Compress-Archive -Path $items -DestinationPath '${zipPath}' -Force }`,
           ],
           { stdio: "inherit" },
         );
       } else {
-        execFileSync("zip", ["-r", zipPath, "."], {
+        execFileSync("zip", ["-r", zipPath, ".", "-x", ...UPLOAD_ZIP_EXCLUDES], {
           cwd: uploadDir,
           stdio: "inherit",
         });
@@ -88,6 +90,10 @@ async function main() {
     console.log("حذف بکاپ قدیمی:", old.f);
   }
 
+  const media = chatMediaDiskUsage(uploadDir);
+  console.log(
+    `رسانهٔ چت در بکاپ روزانه نیست: ${formatByteSize(media.bytes)} در ${media.files} فایل. بکاپ افزایشی هفتگی جداست.`,
+  );
   console.log("بکاپ کامل شد.");
 }
 
