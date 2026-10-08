@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
+import { drawerPointerReachesVaul } from "@/components/ui/drawer-drag"
 import { Drawer as DrawerPrimitive } from "vaul"
 
 function Drawer({
@@ -64,8 +65,19 @@ function DrawerContent({
         )}
         {...props}
       >
-        <div className="mx-auto mt-4 hidden h-2 w-[100px] shrink-0 rounded-full bg-muted group-data-[vaul-drawer-direction=bottom]/drawer-content:block" />
-        {children}
+        <div
+          className="flex min-h-0 flex-1 flex-col"
+          onPointerDown={(event) => {
+            if (drawerPointerReachesVaul(event.target)) return
+            event.stopPropagation()
+          }}
+        >
+          <div
+            data-vaul-drag=""
+            className="mx-auto mt-4 hidden h-2 w-[100px] shrink-0 rounded-full bg-muted group-data-[vaul-drawer-direction=bottom]/drawer-content:block"
+          />
+          {children}
+        </div>
       </DrawerPrimitive.Content>
     </DrawerPortal>
   )
@@ -80,6 +92,7 @@ function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
         className
       )}
       {...props}
+      data-vaul-drag=""
     />
   )
 }

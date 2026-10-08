@@ -124,7 +124,7 @@ export function MediaPermissionDrawer({
         <div className="space-y-2 px-4">
           <MediaFailureText view={view} />
         </div>
-        <DrawerFooter data-vaul-no-drag="">
+        <DrawerFooter>
           <PermissionButton disabled={busy} onActivate={() => void allow()}>
             {busy ? fa.permissions.requesting : fa.chat.allowPermission}
           </PermissionButton>
