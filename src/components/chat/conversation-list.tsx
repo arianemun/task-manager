@@ -67,42 +67,44 @@ export function ConversationList({
                 <Link
                   href={`/chat/${item.id}`}
                   className={cn(
-                    "chat-pad-x flex min-h-14 items-center gap-3 border-b py-2",
+                    "chat-pad-x flex h-[68px] items-center gap-3",
                     active && "bg-accent",
                   )}
                 >
-                  <span className="bg-muted relative flex size-10 shrink-0 items-center justify-center rounded-full text-sm">
+                  <span className="bg-muted relative flex size-12 shrink-0 items-center justify-center rounded-full text-base font-semibold">
                     {item.title.slice(0, 1)}
                     {item.peerId != null && online.includes(item.peerId) ? (
                       <span
-                        className="absolute end-0 bottom-0 size-2.5 rounded-full bg-emerald-500"
+                        className="border-background absolute end-0 bottom-0 size-3 rounded-full border-2 bg-emerald-500"
                         title={fa.chat.online}
                       />
                     ) : null}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-baseline justify-between gap-2">
-                      <span className="truncate font-medium">
+                  <span className="flex h-full min-w-0 flex-1 items-center gap-2 border-b">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-medium">
                         {item.title}
                         {item.type === "DIRECT" && !item.peerActive
                           ? ` (${fa.chat.inactive})`
                           : ""}
                       </span>
+                      <span className="text-muted-foreground block truncate text-sm">
+                        {item.lastBody ?? ""}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 flex-col items-end gap-1">
                       {item.lastAt ? (
-                        <span className="text-muted-foreground shrink-0 text-xs">
+                        <span className="text-muted-foreground text-xs">
                           {chatTimeLabel(item.lastAt)}
                         </span>
                       ) : null}
-                    </span>
-                    <span className="text-muted-foreground block truncate text-sm">
-                      {item.lastBody ?? ""}
+                      {item.unread > 0 ? (
+                        <span className="bg-primary text-primary-foreground inline-flex size-5 items-center justify-center rounded-full text-[11px]">
+                          {toFaDigits(item.unread)}
+                        </span>
+                      ) : null}
                     </span>
                   </span>
-                  {item.unread > 0 ? (
-                    <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs">
-                      {toFaDigits(item.unread)}
-                    </span>
-                  ) : null}
                 </Link>
               </li>
             );

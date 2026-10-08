@@ -422,7 +422,7 @@ export function VoiceHold({
         <button
           type="button"
           ref={buttonRef}
-          className="chat-hold border-input inline-flex size-11 shrink-0 items-center justify-center rounded-md border md:size-10"
+          className="chat-hold bg-primary text-primary-foreground inline-flex size-10 shrink-0 items-center justify-center rounded-full"
           aria-label={phase === "locked" ? fa.chat.voiceLocked : fa.chat.holdToRecord}
           onPointerDown={(event) => void begin(event)}
           onPointerMove={(event) => {
@@ -443,7 +443,7 @@ export function VoiceHold({
             endRecording("preview");
           }}
         >
-          <Mic className="size-5" />
+          <Mic className="size-[22px]" />
         </button>
       ) : null}
       <MediaPermissionDrawer

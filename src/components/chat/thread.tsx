@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
-import { ArrowDown, ArrowRight, ImagePlus } from "lucide-react";
+import { ArrowDown, ArrowRight, ImagePlus, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -32,6 +32,11 @@ import { useOnlineIds } from "./use-presence";
 type Row = ChatMessage & { localStatus?: "sending" | "failed"; previewUrl?: string };
 
 const START_INDEX = 100_000;
+const SENDER_COLORS = ["#c2410c", "#0369a1", "#047857", "#7c3aed", "#be123c", "#b45309"];
+
+function senderColor(id: number): string {
+  return SENDER_COLORS[Math.abs(id) % SENDER_COLORS.length] ?? SENDER_COLORS[0];
+}
 
 function tickMark(messageId: number, meId: number, receipts: MemberReceipt[]) {
   const others = receipts.filter((row) => row.userId !== meId);
@@ -73,6 +78,11 @@ export function ChatThread({
   const [receipts, setReceipts] = useState(initialReceipts);
   const [typingName, setTypingName] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState("");
+  const [freshId, setFreshId] = useState<string | null>(null);
+  const [stickyDay, setStickyDay] = useState(() =>
+    initial.at(-1) ? chatDayLabel(initial.at(-1)!.createdAt) : "",
+  );
+  const seenCount = useRef(initial.length);
   const online = useOnlineIds();
   const typingIdle = useRef<number | null>(null);
   const markedRef = useRef(lastReadMessageId ?? 0);
@@ -418,24 +428,43 @@ export function ChatThread({
 
   const grouped = useMemo(() => rows, [rows]);
 
+  useEffect(() => {
+    if (rows.length > seenCount.current) {
+      setFreshId(rows.at(-1)?.clientId ?? null);
+    }
+    seenCount.current = rows.length;
+  }, [rows]);
+
   return (
-    <div className="relative flex h-full min-h-0 flex-col">
-      <div className="chat-pad-x flex items-center gap-2 border-b py-3">
+    <div className="chat-transcript relative flex h-full min-h-0 flex-col">
+      <div className="chat-pad-x bg-background flex h-14 items-center gap-2 border-b">
         <Link href="/chat" className="md:hidden" aria-label={fa.chat.back}>
-          <ArrowRight className="size-5" />
+          <ArrowRight className="size-[22px]" />
         </Link>
-        <h2 className="min-w-0 truncate font-semibold">
-          {title}
+        <span className="bg-muted flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold">
+          {title.slice(0, 1)}
+        </span>
+        <div className="min-w-0">
+          <h2 className="truncate text-[15px] leading-none font-semibold">{title}</h2>
           {peerId != null ? (
-            <span className="text-muted-foreground ms-2 text-xs font-normal">
+            <p className="text-muted-foreground mt-1 text-xs">
               {online.includes(peerId) ? fa.chat.online : fa.chat.away}
-            </span>
+            </p>
           ) : null}
-        </h2>
+        </div>
       </div>
+      {stickyDay ? (
+        <div className="pointer-events-none absolute inset-x-0 top-14 z-10 flex justify-center pt-1">
+          <span className="chat-day text-muted-foreground">{stickyDay}</span>
+        </div>
+      ) : null}
       <Virtuoso
         ref={virtuoso}
         className="min-h-0 flex-1"
+        rangeChanged={(range) => {
+          const message = grouped[range.startIndex - firstItemIndex];
+          if (message) setStickyDay(chatDayLabel(message.createdAt));
+        }}
         data={grouped}
         firstItemIndex={firstItemIndex}
         initialTopMostItemIndex={Math.max(0, grouped.length - 1)}
@@ -456,19 +485,42 @@ export function ChatThread({
             !showDay &&
             !prev.deletedAt &&
             !message.deletedAt;
+          const next = grouped[local + 1];
+          const groupedWithNext = Boolean(
+            next &&
+              next.senderId === message.senderId &&
+              chatDayLabel(next.createdAt) === chatDayLabel(message.createdAt) &&
+              !next.deletedAt &&
+              !message.deletedAt,
+          );
+          const mine = message.senderId === meId;
+          const isGroup = peerId == null;
+          const photoOnly = !message.body && !message.deletedAt;
           return (
-            <div className="chat-pad-x py-1">
+            <div className={cn("chat-pad-x", groupedWithPrev ? "pt-0.5" : "pt-2")}>
               {showDay ? (
-                <p className="text-muted-foreground py-2 text-center text-xs">
-                  {chatDayLabel(message.createdAt)}
+                <p className="py-2 text-center">
+                  <span className="chat-day text-muted-foreground">{chatDayLabel(message.createdAt)}</span>
                 </p>
+              ) : null}
+              <div className={cn("flex items-end gap-1", mine && "justify-end")}>
+              {isGroup && !mine ? (
+                groupedWithNext ? (
+                  <span className="size-7 shrink-0" />
+                ) : (
+                  <span className="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold">
+                    {message.senderName.slice(0, 1)}
+                  </span>
+                )
               ) : null}
               <article
                 className={cn(
-                  "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-[1.7]",
-                  message.senderId === meId
-                    ? "bg-primary text-primary-foreground ms-auto"
-                    : "bg-muted",
+                  "chat-bubble",
+                  mine
+                    ? "chat-bubble-mine bg-primary text-primary-foreground"
+                    : "chat-bubble-other bg-card",
+                  !groupedWithNext && "is-tail",
+                  freshId === message.clientId && "chat-in",
                 )}
                 onContextMenu={(event) => {
                   if (message.id < 0) return;
@@ -483,8 +535,8 @@ export function ChatThread({
                   event.currentTarget.addEventListener("pointercancel", clear, { once: true });
                 }}
               >
-                {!groupedWithPrev && message.senderId !== meId ? (
-                  <p className="mb-1 text-xs font-medium">
+                {isGroup && !mine && !groupedWithPrev ? (
+                  <p className="mb-0.5 text-[13px] font-medium" style={{ color: senderColor(message.senderId) }}>
                     {message.senderName}
                     {!message.senderActive ? ` (${fa.chat.inactive})` : ""}
                   </p>
@@ -503,7 +555,7 @@ export function ChatThread({
                       <img
                         src={message.previewUrl}
                         alt={fa.chat.photo}
-                        className="mb-1 max-h-80 w-full rounded-md object-contain"
+                        className={cn("chat-photo", photoOnly && "is-only")}
                       />
                     ) : null}
                     {message.previewUrl && message.type === "VIDEO" ? (
@@ -512,7 +564,7 @@ export function ChatThread({
                         controls
                         playsInline
                         preload="metadata"
-                        className="mb-1 max-h-80 w-full rounded-md"
+                        className={cn("chat-photo", photoOnly && "is-only")}
                       />
                     ) : null}
                     {message.attachment?.status === "READY" && message.attachment.kind === "image" && message.attachment.url ? (
@@ -521,7 +573,7 @@ export function ChatThread({
                       <img
                         src={message.attachment.url}
                         alt={fa.chat.photo}
-                        className="mb-1 max-h-80 w-full rounded-md object-contain"
+                        className={cn("chat-photo", photoOnly && "is-only")}
                       />
                     ) : null}
                     {message.attachment?.status === "READY" && message.attachment.kind === "video" && message.attachment.url ? (
@@ -531,7 +583,7 @@ export function ChatThread({
                         controls
                         playsInline
                         preload="metadata"
-                        className="mb-1 max-h-80 w-full rounded-md"
+                        className={cn("chat-photo", photoOnly && "is-only")}
                       />
                     ) : null}
                     {message.attachment?.status === "READY" && message.attachment.kind === "voice" && message.attachment.url ? (
@@ -567,7 +619,7 @@ export function ChatThread({
                   ) : null}
                   </>
                 )}
-                <p className="mt-1 text-end text-[11px] opacity-80">
+                <span className="chat-meta">
                   {message.localStatus === "sending"
                     ? fa.chat.sending
                     : message.localStatus === "failed"
@@ -584,7 +636,7 @@ export function ChatThread({
                         );
                       })()
                     : null}
-                </p>
+                </span>
                 {message.localStatus === "failed" ? (
                   <button
                     type="button"
@@ -612,6 +664,7 @@ export function ChatThread({
                   </button>
                 ) : null}
               </article>
+              </div>
             </div>
           );
         }}
@@ -668,8 +721,8 @@ export function ChatThread({
           </p>
         ) : null}
         <div className="flex items-end gap-2">
-          <label className="border-input inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md border md:size-10">
-            <ImagePlus className="size-5" />
+          <label className="text-muted-foreground inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full">
+            <ImagePlus className="size-[22px]" />
             <span className="sr-only">{fa.chat.attach}</span>
             <input
               type="file"
@@ -687,7 +740,7 @@ export function ChatThread({
             value={draft}
             rows={1}
             placeholder={fa.chat.placeholder}
-            className="border-input max-h-[9rem] min-h-11 flex-1 resize-none rounded-md border px-3 py-2 text-base leading-[1.7] md:text-sm"
+            className="border-input bg-card max-h-36 min-h-11 flex-1 resize-none rounded-3xl border px-4 py-2 text-base leading-[1.5] md:text-sm"
             onChange={(event) => {
               setDraft(event.target.value);
               event.target.style.height = "auto";
@@ -707,8 +760,8 @@ export function ChatThread({
             }}
           />
           {draft.trim() || editing ? (
-            <Button type="submit" className="md:hidden">
-              {fa.chat.send}
+            <Button type="submit" size="icon" className="size-10 rounded-full md:hidden" aria-label={fa.chat.send}>
+              <Send className="size-[22px]" />
             </Button>
           ) : (
             <VoiceHold onRecorded={(file) => void onVoice(file)} onError={setMediaError} />

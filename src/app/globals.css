@@ -64,6 +64,7 @@
   --bottom-nav-h: 3.5rem;
   --bottom-chrome: 0px;
   --keyboard-inset: 0px;
+  --chat-bg: oklch(0.93 0.008 286);
 
   /* تایپوگرافی — حداکثر ۵ اندازه، ۳ وزن */
   --fs-xs: 0.75rem; /* ۱۲ */
@@ -138,6 +139,7 @@
 
   --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.35),
     0 4px 16px oklch(0 0 0 / 0.25);
+  --chat-bg: oklch(0.145 0.01 286);
 
   /* وضعیت‌ها در تاریک — کنتراست بالاتر روی پس‌زمینه تیره */
   --status-done: oklch(0.78 0.15 150);
@@ -418,6 +420,91 @@ html[data-chat-thread="open"] [data-has-bottom-nav] {
 body.chat-recording {
   -webkit-user-select: none;
   user-select: none;
+}
+
+.chat-transcript {
+  background: var(--chat-bg);
+}
+
+.chat-bubble {
+  max-width: 78%;
+  border-radius: 16px;
+  padding: 6px 10px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.chat-bubble-mine.is-tail {
+  border-end-end-radius: 4px;
+}
+
+.chat-bubble-other.is-tail {
+  border-end-start-radius: 4px;
+}
+
+.chat-meta {
+  float: inline-end;
+  margin-inline-start: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.75;
+}
+
+.chat-photo {
+  display: block;
+  width: calc(100% + 20px);
+  max-height: 16rem;
+  margin: -6px -10px 4px;
+  object-fit: cover;
+  border-radius: 12px 12px 0 0;
+}
+
+.chat-photo.is-only {
+  margin-bottom: -6px;
+  border-radius: 12px;
+}
+
+.chat-day {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 8%, var(--chat-bg));
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.chat-album {
+  display: grid;
+  gap: 2px;
+}
+
+@keyframes chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.chat-in {
+  animation: chat-in 150ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-in {
+    animation: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .chat-bubble {
+    max-width: 60%;
+    font-size: 14px;
+  }
 }
 
 [data-page-container].chat-bleed {
