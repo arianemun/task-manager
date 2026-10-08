@@ -86,7 +86,17 @@ export function NotificationBell({
     const onNew = (incoming: SocketNotification) => {
       setItems((prev) => {
         if (prev.some((item) => item.id === incoming.id)) return prev;
-        return [{ ...incoming, readAt: null }, ...prev].slice(0, 15);
+        const next: NotificationItem = {
+          id: incoming.id,
+          type: incoming.type as NotificationItem["type"],
+          title: incoming.title,
+          body: incoming.body,
+          url: incoming.url,
+          priority: incoming.priority,
+          readAt: null,
+          createdAt: incoming.createdAt,
+        };
+        return [next, ...prev].slice(0, 15);
       });
       setUnread((count) => count + 1);
     };
