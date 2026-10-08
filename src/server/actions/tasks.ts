@@ -54,6 +54,19 @@ function parseTaskForm(formData: FormData) {
   });
 }
 
+function revalidateTaskSurfaces(id?: number) {
+  revalidatePath("/admin/tasks");
+  if (id) revalidatePath(`/admin/tasks/${id}`);
+  revalidatePath("/admin/board");
+  revalidatePath("/me");
+}
+
+function saveFailed(error: unknown): { ok: false; error: string } {
+  if (isAuthError(error)) return { ok: false, error: error.message };
+  console.error(error);
+  return { ok: false, error: "ذخیره کار انجام نشد" };
+}
+
 function syncAssignments(
   templateId: number,
   userIds: number[],
@@ -151,12 +164,10 @@ export async function createTaskAction(
       meta: { title: data.title, recurrenceType: data.recurrenceType },
     });
 
-    revalidatePath("/admin/tasks");
-    revalidatePath("/admin/board");
+    revalidateTaskSurfaces(row.id);
     return { ok: true, taskId: row.id };
   } catch (e) {
-    if (isAuthError(e)) return { ok: false, error: e.message };
-    throw e;
+    return saveFailed(e);
   }
 }
 
@@ -225,9 +236,7 @@ export async function updateTaskAction(
       meta: { recurrenceChanged },
     });
 
-    revalidatePath("/admin/tasks");
-    revalidatePath(`/admin/tasks/${id}`);
-    revalidatePath("/admin/board");
+    revalidateTaskSurfaces(id);
 
     return {
       ok: true,
@@ -236,8 +245,7 @@ export async function updateTaskAction(
         : undefined,
     };
   } catch (e) {
-    if (isAuthError(e)) return { ok: false, error: e.message };
-    throw e;
+    return saveFailed(e);
   }
 }
 

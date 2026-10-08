@@ -145,7 +145,7 @@ function parsePermissions(formData: FormData): Permission[] {
 export async function createStaffAction(
   _prev: ActionResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<ActionResult & { userId?: number }> {
   try {
     const actor = await requirePermission("staff.manage");
 
@@ -242,11 +242,14 @@ export async function createStaffAction(
     });
 
     revalidatePath("/admin/staff");
+    revalidatePath(`/admin/staff/${row.id}`);
+    revalidatePath("/me");
     // رمز فقط یک‌بار به کلاینت برمی‌گردد — لاگ نمی‌شود
-    return { ok: true, generatedPassword: tempPassword };
+    return { ok: true as const, generatedPassword: tempPassword, userId: row.id };
   } catch (e) {
     if (isAuthError(e)) return { ok: false, error: e.message };
-    throw e;
+    console.error(e);
+    return { ok: false, error: "ذخیره انجام نشد" };
   }
 }
 
@@ -342,10 +345,12 @@ export async function updateStaffAction(
 
     revalidatePath("/admin/staff");
     revalidatePath(`/admin/staff/${id}`);
+    revalidatePath("/me");
     return { ok: true };
   } catch (e) {
     if (isAuthError(e)) return { ok: false, error: e.message };
-    throw e;
+    console.error(e);
+    return { ok: false, error: "ذخیره انجام نشد" };
   }
 }
 

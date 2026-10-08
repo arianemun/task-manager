@@ -215,6 +215,7 @@ export default async function StaffDetailPage({ params, searchParams }: Props) {
             </CardHeader>
             <CardContent>
               <StaffForm
+                key={`${user.id}-${user.updatedAt.getTime()}`}
                 mode="edit"
                 departments={departments}
                 actorRole={actor.role}

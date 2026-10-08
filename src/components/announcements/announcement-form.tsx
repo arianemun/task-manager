@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { ActionResult } from "@/server/actions/auth";
+import { fa } from "@/lib/i18n/fa";
+import { useSubmitLock } from "@/lib/ui/submit-lock";
 import { createAnnouncementAction } from "@/server/actions/announcements";
 
 const initial: ActionResult | null = null;
@@ -33,16 +36,34 @@ export function AnnouncementForm({
     createAnnouncementAction,
     initial,
   );
+  const { guard, bind } = useSubmitLock(pending);
+  const [formKey, setFormKey] = useState(0);
   const [audience, setAudience] = useState("ALL");
   const [departmentId, setDepartmentId] = useState("");
   const [isPinned, setIsPinned] = useState(false);
 
   useEffect(() => {
-    if (state?.ok) router.refresh();
+    if (!state) return;
+    if (!state.ok) {
+      toast.error(state.error || fa.common.saveFailed);
+      return;
+    }
+    toast.success(fa.common.announcementPublished);
+    setAudience("ALL");
+    setDepartmentId("");
+    setIsPinned(false);
+    setFormKey((key) => key + 1);
+    router.refresh();
   }, [state, router]);
 
   return (
-    <form action={action} className="space-y-3">
+    <form
+      key={formKey}
+      ref={bind}
+      action={action}
+      className="space-y-3"
+      onSubmit={(event) => guard(event)}
+    >
       <div className="space-y-2">
         <Label htmlFor="title">عنوان</Label>
         <Input id="title" name="title" required disabled={pending} />
@@ -113,8 +134,8 @@ export function AnnouncementForm({
           {state.error}
         </p>
       ) : null}
-      <Button type="submit" disabled={pending}>
-        انتشار اطلاعیه
+      <Button type="submit" disabled={pending} aria-busy={pending}>
+        {pending ? fa.common.loading : "انتشار اطلاعیه"}
       </Button>
     </form>
   );

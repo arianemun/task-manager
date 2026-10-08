@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,7 @@ export function NewChatButton(props: {
   const [picked, setPicked] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const held = useRef(false);
 
   const people = useMemo(() => {
     const needle = normalizePersianText(q);
@@ -54,7 +55,16 @@ export function NewChatButton(props: {
   function go(id: number) {
     setOpen(false);
     router.push(`/chat/${id}`);
-    router.refresh();
+  }
+
+  function claimClick() {
+    if (held.current || pending) return false;
+    held.current = true;
+    return true;
+  }
+
+  function releaseClick() {
+    held.current = false;
   }
 
   return (
@@ -107,10 +117,20 @@ export function NewChatButton(props: {
                     className="hover:bg-accent w-full rounded-md px-3 py-3 text-start"
                     disabled={pending}
                     onClick={() => {
+                      if (!claimClick()) return;
                       startTransition(async () => {
-                        const result = await createDepartmentChatAction(dept.id);
-                        if (!result.ok) setError(result.error);
-                        else go(result.id);
+                        try {
+                          const result = await createDepartmentChatAction(dept.id);
+                          if (!result.ok) {
+                            setError(result.error);
+                            releaseClick();
+                            return;
+                          }
+                          go(result.id);
+                        } catch {
+                          setError(fa.common.saveFailed);
+                          releaseClick();
+                        }
                       });
                     }}
                   >
@@ -146,10 +166,20 @@ export function NewChatButton(props: {
                           value={person.fullName}
                           onSelect={() => {
                             if (mode === "direct") {
+                              if (!claimClick()) return;
                               startTransition(async () => {
-                                const result = await createDirectChatAction(person.id);
-                                if (!result.ok) setError(result.error);
-                                else go(result.id);
+                                try {
+                                  const result = await createDirectChatAction(person.id);
+                                  if (!result.ok) {
+                                    setError(result.error);
+                                    releaseClick();
+                                    return;
+                                  }
+                                  go(result.id);
+                                } catch {
+                                  setError(fa.common.saveFailed);
+                                  releaseClick();
+                                }
                               });
                               return;
                             }
@@ -173,18 +203,29 @@ export function NewChatButton(props: {
                   type="button"
                   className="mt-3 w-full"
                   disabled={pending}
+                  aria-busy={pending}
                   onClick={() => {
+                    if (!claimClick()) return;
                     startTransition(async () => {
-                      const result = await createGroupChatAction({
-                        title,
-                        memberIds: picked,
-                      });
-                      if (!result.ok) setError(result.error);
-                      else go(result.id);
+                      try {
+                        const result = await createGroupChatAction({
+                          title,
+                          memberIds: picked,
+                        });
+                        if (!result.ok) {
+                          setError(result.error);
+                          releaseClick();
+                          return;
+                        }
+                        go(result.id);
+                      } catch {
+                        setError(fa.common.saveFailed);
+                        releaseClick();
+                      }
                     });
                   }}
                 >
-                  {fa.common.create}
+                  {pending ? fa.common.loading : fa.common.create}
                 </Button>
               ) : null}
             </div>

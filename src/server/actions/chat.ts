@@ -16,10 +16,10 @@ import { requirePermission, requireUser } from "@/lib/auth/user";
 import { requestSocketJoin } from "@/lib/realtime/notify";
 
 function fail(error: unknown): { ok: false; error: string } {
-  if (error instanceof ChatError || error instanceof z.ZodError) {
-    return { ok: false, error: error instanceof ChatError ? error.message : "درخواست نامعتبر است" };
-  }
-  throw error;
+  if (error instanceof ChatError) return { ok: false, error: error.message };
+  if (error instanceof z.ZodError) return { ok: false, error: "درخواست نامعتبر است" };
+  console.error(error);
+  return { ok: false, error: "ذخیره انجام نشد" };
 }
 
 const positiveId = z.number().int().positive();

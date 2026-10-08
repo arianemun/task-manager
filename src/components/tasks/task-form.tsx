@@ -30,6 +30,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ChevronDown } from "lucide-react";
 import { fa } from "@/lib/i18n/fa";
+import { useSubmitLock } from "@/lib/ui/submit-lock";
 import type { ActionResult } from "@/server/actions/auth";
 import {
   createTaskAction,
@@ -82,7 +83,10 @@ export function TaskForm({
   const router = useRouter();
   const action = mode === "create" ? createTaskAction : updateTaskAction;
   const [state, formAction, pending] = useActionState(action, emptyState);
+  const { guard, bind } = useSubmitLock(pending);
 
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
   const [endDate, setEndDate] = useState<string | null>(initial?.endDate ?? null);
   const [skipHolidays, setSkipHolidays] = useState(initial?.skipHolidays ?? true);
@@ -106,22 +110,24 @@ export function TaskForm({
   useEffect(() => {
     if (!state) return;
     if (!state.ok) {
-      toast.error(state.error);
+      toast.error(state.error || fa.common.taskSaveFailed);
       return;
     }
     const hint =
       "recurrenceChangedHint" in state
         ? (state as { recurrenceChangedHint?: string }).recurrenceChangedHint
         : undefined;
+    if (mode === "create") {
+      const taskId = "taskId" in state ? (state as { taskId?: number }).taskId : undefined;
+      toast.success(fa.common.taskCreated);
+      if (hint) toast.message(hint);
+      if (taskId) router.replace(`/admin/tasks/${taskId}`);
+      return;
+    }
     if (hint) toast.message(hint);
     else toast.success(fa.common.success);
-
-    const taskId =
-      "taskId" in state ? (state as { taskId?: number }).taskId : initial?.id;
-    if (taskId) router.push(`/admin/tasks/${taskId}`);
-    else router.push("/admin/tasks");
     router.refresh();
-  }, [state, router, initial?.id]);
+  }, [state, router, mode]);
 
   const preview = (
     <OccurrencePreview
@@ -133,7 +139,14 @@ export function TaskForm({
   );
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form
+      ref={bind}
+      action={formAction}
+      className="space-y-6"
+      onSubmit={(event) => {
+        guard(event);
+      }}
+    >
       {mode === "edit" && initial ? (
         <input type="hidden" name="id" value={initial.id} />
       ) : null}
@@ -152,7 +165,8 @@ export function TaskForm({
               id="title"
               name="title"
               required
-              defaultValue={initial?.title ?? ""}
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
               disabled={pending}
             />
           </div>
@@ -162,7 +176,8 @@ export function TaskForm({
               id="description"
               name="description"
               rows={3}
-              defaultValue={initial?.description ?? ""}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
               disabled={pending}
             />
           </div>
@@ -362,6 +377,7 @@ export function TaskForm({
         <Button
           type="submit"
           disabled={pending}
+          aria-busy={pending}
           className="min-h-11 flex-1 md:flex-none"
         >
           {pending ? fa.common.loading : fa.common.save}

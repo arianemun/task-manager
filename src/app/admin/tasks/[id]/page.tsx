@@ -67,6 +67,7 @@ export default async function EditTaskPage({ params }: Props) {
 
       {canEdit ? (
         <TaskForm
+          key={`${t.id}-${t.updatedAt.getTime()}`}
           mode="edit"
           categories={categories}
           staff={staff}

@@ -110,10 +110,12 @@ export async function createAnnouncementAction(
 
     revalidatePath("/admin/announcements");
     revalidatePath("/me/info");
+    revalidatePath("/me");
     return { ok: true };
   } catch (e) {
     if (isAuthError(e)) return { ok: false, error: e.message };
-    throw e;
+    console.error(e);
+    return { ok: false, error: "ذخیره انجام نشد" };
   }
 }
 

@@ -69,7 +69,8 @@ export async function createHolidaysAction(
     return { ok: true };
   } catch (e) {
     if (isAuthError(e)) return { ok: false, error: e.message };
-    throw e;
+    console.error(e);
+    return { ok: false, error: "ذخیره انجام نشد" };
   }
 }
 

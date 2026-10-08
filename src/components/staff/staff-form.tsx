@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -35,6 +36,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { PERMISSIONS, type Permission, type Role } from "@/db/schema";
 import { fa } from "@/lib/i18n/fa";
+import { useSubmitLock } from "@/lib/ui/submit-lock";
 import {
   PERMISSION_DESCRIPTIONS,
   PERMISSION_LABELS,
@@ -99,6 +101,8 @@ export function StaffForm({ mode, departments, actorRole, initial }: Props) {
   const router = useRouter();
   const action = mode === "create" ? createStaffAction : updateStaffAction;
   const [state, formAction, pending] = useActionState(action, initialState);
+  const { guard, release, bind } = useSubmitLock(pending);
+  const [, startTransition] = useTransition();
   const [password, setPassword] = useState<string | null>(null);
 
   const canPickRole = actorRole === "ADMIN";
@@ -124,18 +128,19 @@ export function StaffForm({ mode, departments, actorRole, initial }: Props) {
   });
 
   useEffect(() => {
-    if (!state?.ok) return;
+    if (!state) return;
+    if (!state.ok) {
+      toast.error(state.error || fa.common.saveFailed);
+      return;
+    }
     if (state.generatedPassword) {
+      toast.success(fa.common.staffCreated);
       setPassword(state.generatedPassword);
       return;
     }
-    if (mode === "edit" && initial) {
-      router.push(`/admin/staff/${initial.id}`);
-    } else {
-      router.push("/admin/staff");
-    }
+    toast.success(fa.common.success);
     router.refresh();
-  }, [state, mode, initial, router]);
+  }, [state, router]);
 
   function onSubmit(values: StaffFormValues) {
     const fd = new FormData();
@@ -157,13 +162,26 @@ export function StaffForm({ mode, departments, actorRole, initial }: Props) {
         fd.append("permissions", p);
       }
     }
-    formAction(fd);
+    startTransition(() => {
+      formAction(fd);
+    });
   }
 
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form
+          ref={bind}
+          onSubmit={(event) => {
+            if (password) {
+              event.preventDefault();
+              return;
+            }
+            if (guard(event)) return;
+            void form.handleSubmit(onSubmit, () => release())(event);
+          }}
+          className="space-y-4"
+        >
           <Card>
             <CardHeader>
               <CardTitle className="text-base">اطلاعات فردی</CardTitle>
@@ -419,7 +437,7 @@ export function StaffForm({ mode, departments, actorRole, initial }: Props) {
           ) : null}
 
           <div className="bg-background/95 sticky-actions sticky z-10 flex gap-2 border-t py-3 backdrop-blur md:static md:bottom-auto md:border-0 md:bg-transparent md:py-0 md:backdrop-blur-none">
-            <Button type="submit" disabled={pending} className="min-h-11 flex-1 md:flex-none">
+            <Button type="submit" disabled={pending || password != null} aria-busy={pending} className="min-h-11 flex-1 md:flex-none">
               {pending ? fa.common.loading : fa.common.save}
             </Button>
             <Button
@@ -438,9 +456,13 @@ export function StaffForm({ mode, departments, actorRole, initial }: Props) {
       <PasswordRevealDialog
         password={password}
         onClose={() => {
+          const userId =
+            state?.ok && "userId" in state && typeof state.userId === "number"
+              ? state.userId
+              : undefined;
           setPassword(null);
-          router.push("/admin/staff");
-          router.refresh();
+          if (userId) router.replace(`/admin/staff/${userId}`);
+          else router.replace("/admin/staff");
         }}
         title="رمز اولیه پرسنل"
       />
