@@ -202,6 +202,36 @@ describe("permission prep", () => {
     expect(activeTrackCount(stream)).toBe(0);
   });
 
+  it("returns the media error name instead of dropping it", async () => {
+    const error = new Error("blocked");
+    error.name = "NotAllowedError";
+    const next = await enableAllPermissions({
+      includeNotifications: false,
+      statuses: prompt,
+      requestNotification: async () => "granted",
+      getUserMedia: async () => {
+        throw error;
+      },
+    });
+    expect(next.mediaGranted).toBe(false);
+    expect(next.mediaError?.name).toBe("NotAllowedError");
+    expect(next.mediaError?.device).toBe("both");
+    expect(next.statuses.microphone).toBe("denied");
+    expect(next.statuses.camera).toBe("denied");
+  });
+
+  it("reports a skipped capture when both devices are already denied", async () => {
+    const next = await enableAllPermissions({
+      includeNotifications: false,
+      statuses: { ...prompt, microphone: "denied", camera: "denied" },
+      requestNotification: async () => "granted",
+      getUserMedia: async () => {
+        throw new Error("should not run");
+      },
+    });
+    expect(next.mediaError).toEqual({ name: "NotAllowedError", elapsedMs: 0, device: "both" });
+  });
+
   it("shows the iPhone install guide only outside the installed web app", () => {
     expect(showsIosInstallGuide({ ios: true, standalone: false })).toBe(true);
     expect(showsIosInstallGuide({ ios: true, standalone: true })).toBe(false);

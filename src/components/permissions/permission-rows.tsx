@@ -1,6 +1,8 @@
 "use client";
 
+import { format } from "date-fns-jalali";
 import { fa } from "@/lib/i18n/fa";
+import type { PermissionErrorLog } from "@/lib/permissions/browser";
 import {
   PERMISSION_KINDS,
   showsIosInstallGuide,
@@ -9,6 +11,7 @@ import {
   type PermissionStatus,
   type ShownPermissions,
 } from "@/lib/permissions/status";
+import { toFaDigits } from "@/lib/utils";
 
 const title: Record<PermissionKind, string> = {
   notifications: fa.permissions.notifications,
@@ -31,14 +34,20 @@ function deniedText(kind: PermissionKind, ios: boolean): string {
   return ios ? fa.permissions.deniedIos[kind] : fa.permissions.deniedOther[kind];
 }
 
+function errorTime(at: number): string {
+  return toFaDigits(format(new Date(at), "yyyy/MM/dd HH:mm"));
+}
+
 export function PermissionRows({
   statuses,
   ios,
   standalone,
+  errors,
 }: {
   statuses: ShownPermissions;
   ios: boolean;
   standalone: boolean;
+  errors?: Partial<Record<PermissionKind, PermissionErrorLog>>;
 }) {
   const install = showsIosInstallGuide({ ios, standalone });
 
@@ -59,6 +68,11 @@ export function PermissionRows({
           ) : null}
           {statuses[kind] === "denied" ? (
             <p className="text-sm leading-[1.7]">{deniedText(kind, ios)}</p>
+          ) : null}
+          {errors?.[kind] ? (
+            <p className="text-muted-foreground text-xs">
+              {fa.permissions.lastError}: {errors[kind].name} — {errorTime(errors[kind].at)}
+            </p>
           ) : null}
         </li>
       ))}

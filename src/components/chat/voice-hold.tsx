@@ -8,7 +8,13 @@ import { bindNoCallout, capturePointer } from "@/lib/chat/no-callout";
 import { CHAT_VOICE_MAX_MS } from "@/lib/chat/types";
 import { voiceGesture, type VoiceGesture } from "@/lib/chat/voice-gesture";
 import { voiceStartMode } from "@/lib/chat/voice-mode";
-import { getPermissionStatus, markSessionMedia, sessionMediaGranted } from "@/lib/permissions/browser";
+import {
+  getPermissionStatus,
+  markSessionMedia,
+  rememberPermissionError,
+  sessionMediaGranted,
+} from "@/lib/permissions/browser";
+import { describeMediaFailure } from "@/lib/permissions/media-feedback";
 import {
   interpretGetUserMedia,
   isIosUserAgent,
@@ -246,6 +252,7 @@ export function VoiceHold({
       setGate("denied");
       return;
     }
+    const captureStarted = Date.now();
     try {
       const media = await navigator.mediaDevices.getUserMedia({ audio: true });
       markSessionMedia("microphone");
@@ -315,15 +322,25 @@ export function VoiceHold({
       }, CHAT_VOICE_MAX_MS);
     } catch (error) {
       stopTracks();
-      const errorName = error instanceof Error ? error.name : "";
+      const errorName = error instanceof Error && error.name ? error.name : "Error";
+      const elapsedMs = Date.now() - captureStarted;
+      rememberPermissionError("microphone", errorName, Date.now(), elapsedMs);
       const outcome = interpretGetUserMedia({ ok: false, errorName, fingerDown: pressed.current });
+      const installed =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+      const view = describeMediaFailure({
+        errorName,
+        elapsedMs,
+        device: "microphone",
+        ios,
+        installed,
+      });
       if (outcome === "drawer") {
         hint.current = "denied";
         setGate("denied");
-      } else if (outcome === "missing") {
-        onError(fa.chat.micMissing);
       } else {
-        onError(fa.common.error);
+        onError(view.errorName ? `${view.lines.join(" ")} (${view.errorName})` : view.lines.join(" "));
       }
     }
   }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import {
   ResponsiveDialog,
   ResponsiveDialogBody,
@@ -12,7 +11,14 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { fa } from "@/lib/i18n/fa";
-import { readShownPermissions, rememberMediaResult } from "@/lib/permissions/browser";
+import {
+  clearPermissionError,
+  readShownPermissions,
+  rememberMediaError,
+  rememberMediaResult,
+  rememberPermissionError,
+} from "@/lib/permissions/browser";
+import { feedbackForEnable, type MediaFailureView } from "@/lib/permissions/media-feedback";
 import {
   enableAllPermissions,
   isIosUserAgent,
@@ -24,6 +30,7 @@ import {
   completePermissionSetupAction,
   snoozePermissionPrepAction,
 } from "@/server/actions/permissions";
+import { MediaFailureText, PermissionButton } from "./permission-button";
 import { PermissionRows } from "./permission-rows";
 
 const empty: ShownPermissions = {
@@ -56,6 +63,7 @@ export function PermissionPrep({
   const [standalone, setStandalone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [failure, setFailure] = useState<MediaFailureView | null>(null);
 
   useEffect(() => {
     const agent = isIosUserAgent(
@@ -91,6 +99,7 @@ export function PermissionPrep({
   async function enableAll() {
     setBusy(true);
     setError("");
+    setFailure(null);
     try {
       const agent = isIosUserAgent(
         navigator.userAgent,
@@ -107,19 +116,48 @@ export function PermissionPrep({
         getUserMedia: (constraints) => navigator.mediaDevices.getUserMedia(constraints),
       });
       rememberMediaResult(next.statuses);
+      if (next.mediaGranted) {
+        clearPermissionError("microphone");
+        clearPermissionError("camera");
+      } else if (next.mediaError) {
+        rememberMediaError(next.mediaError.device, next.mediaError);
+      }
+      if (next.notificationError) {
+        rememberPermissionError("notifications", next.notificationError);
+      }
       const shown = await readShownPermissions();
       shown.notifications = next.statuses.notifications;
       setStatuses(shown);
+      const note = feedbackForEnable({
+        mediaError: next.mediaError,
+        notificationError: next.notificationError,
+        mediaGranted: next.mediaGranted,
+        ios: agent,
+        installed,
+      });
       if (next.mediaGranted) {
         const saved = await completePermissionSetupAction();
         if (!saved.ok) {
           setError(saved.error);
           return;
         }
-        setOpen(false);
       }
-    } catch {
-      setError(fa.common.error);
+      if (note) {
+        setFailure(note);
+        return;
+      }
+      setOpen(false);
+    } catch (error) {
+      const name = error instanceof Error && error.name ? error.name : "Error";
+      setFailure(
+        feedbackForEnable({
+          mediaError: { name, elapsedMs: 0, device: "both" },
+          notificationError: null,
+          mediaGranted: false,
+          ios,
+          installed: standalone,
+        }),
+      );
     } finally {
       setBusy(false);
     }
@@ -146,15 +184,16 @@ export function PermissionPrep({
         </ResponsiveDialogHeader>
         <ResponsiveDialogBody className="space-y-4">
           <PermissionRows statuses={statuses} ios={ios} standalone={standalone} />
+          <MediaFailureText view={failure} />
           {error ? <p className="text-destructive text-sm">{error}</p> : null}
         </ResponsiveDialogBody>
         <ResponsiveDialogFooter>
-          <Button type="button" disabled={busy} onClick={() => void enableAll()}>
-            {fa.permissions.enableAll}
-          </Button>
-          <Button type="button" variant="outline" disabled={busy} onClick={() => void later()}>
+          <PermissionButton disabled={busy} onActivate={() => void enableAll()}>
+            {busy ? fa.permissions.requesting : fa.permissions.enableAll}
+          </PermissionButton>
+          <PermissionButton variant="outline" disabled={busy} onActivate={() => void later()}>
             {fa.permissions.later}
-          </Button>
+          </PermissionButton>
         </ResponsiveDialogFooter>
       </ResponsiveDialogContent>
     </ResponsiveDialog>

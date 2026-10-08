@@ -1,24 +1,36 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 import {
   Drawer,
   DrawerContent,
-  DrawerDescription,
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { fa } from "@/lib/i18n/fa";
-import { markSessionMedia } from "@/lib/permissions/browser";
+import {
+  clearPermissionError,
+  markSessionMedia,
+  readPermissionErrors,
+  rememberMediaError,
+} from "@/lib/permissions/browser";
+import { describeMediaFailure, type MediaFailureView } from "@/lib/permissions/media-feedback";
 import {
   captureAndRelease,
   constraintsForKind,
-  interpretGetUserMedia,
+  type MediaAttemptError,
   type MediaKind,
   type PermissionStatus,
 } from "@/lib/permissions/status";
+import { MediaFailureText, PermissionButton } from "./permission-button";
+
+function installedApp(): boolean {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
+  );
+}
 
 export function MediaPermissionDrawer({
   kind,
@@ -35,38 +47,71 @@ export function MediaPermissionDrawer({
   onOpenChange: (open: boolean) => void;
   onResolved: (status: PermissionStatus) => void;
 }) {
-  const [missing, setMissing] = useState(false);
-  const denied = status === "denied";
+  const [busy, setBusy] = useState(false);
+  const [installed, setInstalled] = useState(false);
+  const [failure, setFailure] = useState<MediaAttemptError | null>(null);
   const title = kind === "microphone" ? fa.chat.voiceNeedsMic : fa.chat.videoNeedsCamera;
-  const guide = denied
-    ? ios
-      ? fa.permissions.deniedIos[kind]
-      : fa.permissions.deniedOther[kind]
-    : missing
-      ? kind === "microphone"
-        ? fa.chat.micMissing
-        : fa.chat.cameraMissing
+
+  useEffect(() => {
+    setInstalled(installedApp());
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const logged = readPermissionErrors()[kind];
+    if (!logged) return;
+    setFailure({ name: logged.name, elapsedMs: logged.elapsedMs, device: kind });
+  }, [open, kind]);
+
+  const view: MediaFailureView | null = failure
+    ? describeMediaFailure({
+        errorName: failure.name,
+        elapsedMs: failure.elapsedMs,
+        device: kind,
+        ios,
+        installed,
+      })
+    : status === "denied"
+      ? describeMediaFailure({
+          errorName: "NotAllowedError",
+          elapsedMs: 300,
+          device: kind,
+          ios,
+          installed,
+        })
       : null;
 
   async function allow() {
-    setMissing(false);
+    setBusy(true);
+    setFailure(null);
+    const started = Date.now();
     try {
       await captureAndRelease(
         (constraints) => navigator.mediaDevices.getUserMedia(constraints),
         constraintsForKind(kind),
       );
+      clearPermissionError(kind);
       markSessionMedia(kind);
-      if (kind === "camera") markSessionMedia("microphone");
+      if (kind === "camera") {
+        clearPermissionError("microphone");
+        markSessionMedia("microphone");
+      }
       onResolved("granted");
       onOpenChange(false);
     } catch (error) {
-      const name = error instanceof Error ? error.name : "";
-      const outcome = interpretGetUserMedia({ ok: false, errorName: name, fingerDown: true });
-      if (outcome === "missing") {
-        setMissing(true);
-        return;
+      const name = error instanceof Error && error.name ? error.name : "Error";
+      const attempt: MediaAttemptError = {
+        name,
+        elapsedMs: Date.now() - started,
+        device: kind,
+      };
+      setFailure(attempt);
+      rememberMediaError(kind, attempt);
+      if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
+        onResolved("denied");
       }
-      onResolved("denied");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -75,12 +120,14 @@ export function MediaPermissionDrawer({
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle>{title}</DrawerTitle>
-          {guide ? <DrawerDescription>{guide}</DrawerDescription> : null}
         </DrawerHeader>
-        <DrawerFooter>
-          <Button type="button" onClick={() => void allow()}>
-            {fa.chat.allowPermission}
-          </Button>
+        <div className="space-y-2 px-4">
+          <MediaFailureText view={view} />
+        </div>
+        <DrawerFooter data-vaul-no-drag="">
+          <PermissionButton disabled={busy} onActivate={() => void allow()}>
+            {busy ? fa.permissions.requesting : fa.chat.allowPermission}
+          </PermissionButton>
         </DrawerFooter>
       </DrawerContent>
     </Drawer>

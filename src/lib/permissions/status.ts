@@ -130,33 +130,67 @@ export async function captureAndRelease(
   }
 }
 
+export type MediaDevice = "microphone" | "camera" | "both";
+
+export type MediaAttemptError = {
+  name: string;
+  elapsedMs: number;
+  device: MediaDevice;
+};
+
+export type EnableAllResult = {
+  statuses: PermissionMap;
+  mediaGranted: boolean;
+  mediaError: MediaAttemptError | null;
+  notificationError: string | null;
+};
+
+export function deviceForConstraints(constraints: MediaStreamConstraints): MediaDevice {
+  const audio = "audio" in constraints && Boolean(constraints.audio);
+  const video = "video" in constraints && Boolean(constraints.video);
+  if (audio && video) return "both";
+  if (video) return "camera";
+  return "microphone";
+}
+
 export async function enableAllPermissions(deps: {
   includeNotifications: boolean;
   statuses: PermissionMap;
   requestNotification: () => Promise<string>;
   getUserMedia: (constraints: MediaStreamConstraints) => Promise<TrackStream>;
-}): Promise<{ statuses: PermissionMap; mediaGranted: boolean }> {
+}): Promise<EnableAllResult> {
   const next: PermissionMap = { ...deps.statuses };
   let mediaGranted = false;
+  let notificationError: string | null = null;
 
   if (deps.includeNotifications && next.notifications !== "denied") {
     try {
       next.notifications = fromNotificationPermission(await deps.requestNotification());
-    } catch {
+      if (next.notifications === "denied") notificationError = "denied";
+    } catch (error) {
       next.notifications = "unknown";
+      notificationError = error instanceof Error && error.name ? error.name : "Error";
     }
   }
 
   const constraints = mediaConstraintsForRequest(next);
-  if (!constraints) return { statuses: next, mediaGranted };
+  if (!constraints) {
+    return {
+      statuses: next,
+      mediaGranted,
+      mediaError: { name: "NotAllowedError", elapsedMs: 0, device: "both" },
+      notificationError,
+    };
+  }
 
+  const started = Date.now();
   try {
     await captureAndRelease(deps.getUserMedia, constraints);
     mediaGranted = true;
     if ("audio" in constraints && constraints.audio) next.microphone = "granted";
     if ("video" in constraints && constraints.video) next.camera = "granted";
   } catch (error) {
-    const name = error instanceof Error ? error.name : "";
+    const name = error instanceof Error && error.name ? error.name : "Error";
     const denied =
       name === "NotAllowedError" ||
       name === "PermissionDeniedError" ||
@@ -167,7 +201,17 @@ export async function enableAllPermissions(deps: {
     if ("video" in constraints && constraints.video) {
       next.camera = denied ? "denied" : "prompt";
     }
+    return {
+      statuses: next,
+      mediaGranted,
+      mediaError: {
+        name,
+        elapsedMs: Date.now() - started,
+        device: deviceForConstraints(constraints),
+      },
+      notificationError,
+    };
   }
 
-  return { statuses: next, mediaGranted };
+  return { statuses: next, mediaGranted, mediaError: null, notificationError };
 }
