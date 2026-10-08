@@ -29,6 +29,8 @@ describe("منطق Alert داشبورد سلامت داده", () => {
     expect(dashboardHealthAlerts(null, nowMs)).toEqual({
       yellow: true,
       red: false,
+      stale: true,
+      diskWarn: false,
     });
   });
 
@@ -39,6 +41,8 @@ describe("منطق Alert داشبورد سلامت داده", () => {
     expect(dashboardHealthAlerts(old, nowMs)).toEqual({
       yellow: true,
       red: false,
+      stale: true,
+      diskWarn: false,
     });
   });
 
@@ -58,6 +62,8 @@ describe("منطق Alert داشبورد سلامت داده", () => {
     expect(dashboardHealthAlerts(bad, nowMs)).toEqual({
       yellow: false,
       red: true,
+      stale: false,
+      diskWarn: false,
     });
   });
 
@@ -65,6 +71,32 @@ describe("منطق Alert داشبورد سلامت داده", () => {
     expect(dashboardHealthAlerts(report(), nowMs)).toEqual({
       yellow: false,
       red: false,
+      stale: false,
+      diskWarn: false,
     });
+  });
+
+  it("دیسک زیر ۱۵ درصد زرد و زیر ۸ درصد قرمز است", () => {
+    const volume = {
+      id: "data" as const,
+      title: "پوشه داده",
+      freeBytes: 1,
+      totalBytes: 10,
+      freeRatio: 0.1,
+      level: "warn" as const,
+    };
+    const warn = report({
+      disk: { volumes: [volume], sections: [] },
+    });
+    expect(dashboardHealthAlerts(warn, nowMs).diskWarn).toBe(true);
+    expect(dashboardHealthAlerts(warn, nowMs).red).toBe(false);
+    const critical = report({
+      disk: {
+        volumes: [{ ...volume, freeRatio: 0.05, level: "critical" }],
+        sections: [],
+      },
+    });
+    expect(dashboardHealthAlerts(critical, nowMs).red).toBe(true);
+    expect(dashboardHealthAlerts(critical, nowMs).diskWarn).toBe(false);
   });
 });

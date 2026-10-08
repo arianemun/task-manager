@@ -307,6 +307,28 @@ pm2 reload task-manager
 
 در صورت نیاز zip آپلودها را دستی روی `UPLOAD_DIR` باز کنید.
 
+## بکاپ خارج از سرور
+
+کپی روزانه روی همین دیسک، از خرابی دیسک محافظت نمی‌کند. `scripts/cron/offsite-backup.sh` پوشهٔ `BACKUP_DIR` را با rsync و SSH به سرور دیگری می‌فرستد. تا `OFFSITE_BACKUP_TARGET` خالی باشد اسکریپت بلافاصله خارج می‌شود و `scripts/cron/install.sh` آن را به crontab اضافه نمی‌کند.
+
+روی سرور مقصد یک کاربر محدود و یک پوشه بسازید و کلید عمومی کاربر `www` را در `authorized_keys` بگذارید. سپس در `.cron.env`:
+
+```bash
+OFFSITE_BACKUP_TARGET=backup@192.0.2.10:/var/backups/task-manager
+```
+
+نمونهٔ اجرا، معادل کاری که اسکریپت می‌کند:
+
+```bash
+rsync -a -e "ssh -o BatchMode=yes" /var/task-manager/backups/ backup@192.0.2.10:/var/backups/task-manager/
+```
+
+اگر خواستید هر شب بعد از بکاپ محلی اجرا شود، این خط را خودتان به crontab کاربر `www` اضافه کنید:
+
+```bash
+# 30 4 * * * bash /www/wwwroot/task-manager/scripts/cron/offsite-backup.sh
+```
+
 ---
 
 ## روال آپدیت نسخه جدید

@@ -4,6 +4,7 @@ import {
   dashboardHealthAlerts,
   formatTehranDateTime,
 } from "@/lib/health/db-check";
+import { formatDiskVolume } from "@/lib/health/disk-space";
 import { toFaDigits } from "@/lib/utils";
 
 export function DataHealthAlerts({ report }: { report: HealthReport | null }) {
@@ -29,13 +30,36 @@ export function DataHealthAlerts({ report }: { report: HealthReport | null }) {
                 {check.detail ? ` — ${check.detail}` : ""}
               </li>
             ))}
+            {report.disk?.volumes
+              .filter((item) => item.level === "critical")
+              .map((item) => (
+                <li key={item.id}>{formatDiskVolume(item)}</li>
+              ))}
           </ul>
           <Link className="underline underline-offset-2" href="/admin/settings?tab=health">
             جزئیات سلامت داده
           </Link>
         </div>
       ) : null}
-      {alerts.yellow ? (
+      {alerts.diskWarn && report?.disk ? (
+        <div
+          role="alert"
+          className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm leading-[1.7] text-amber-950 dark:text-amber-100"
+        >
+          <p className="font-medium">فضای دیسک رو به اتمام است</p>
+          <ul className="space-y-1">
+            {report.disk.volumes
+              .filter((item) => item.level === "warn")
+              .map((item) => (
+                <li key={item.id}>{formatDiskVolume(item)}</li>
+              ))}
+          </ul>
+          <Link className="underline underline-offset-2" href="/admin/settings?tab=health">
+            جزئیات سلامت داده
+          </Link>
+        </div>
+      ) : null}
+      {alerts.stale ? (
         <div
           role="alert"
           className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm leading-[1.7] text-amber-950 dark:text-amber-100"

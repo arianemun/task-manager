@@ -29,6 +29,12 @@ import {
   LAST_PERIOD_CLOSE_KEY,
 } from "@/lib/settings/system-keys";
 import { uploadRoot } from "@/lib/chat/media-size";
+import {
+  formatByteSize,
+  formatDiskVolume,
+  measureDiskSpace,
+  type DiskSpaceReport,
+} from "@/lib/health/disk-space";
 import { toFaDigits } from "@/lib/utils";
 
 const SAMPLE_LIMIT = 10;
@@ -67,6 +73,7 @@ export type HealthReport = {
   ok: boolean;
   elapsedMs: number;
   checks: HealthFinding[];
+  disk?: DiskSpaceReport;
 };
 
 type CheckRunner = {
@@ -803,11 +810,14 @@ export function runHealthChecks(
     detail: backup.detail,
     durationMs: Math.round(performance.now() - backupStarted),
   });
+  const disk = measureDiskSpace();
+  const diskCritical = disk.volumes.some((item) => item.level === "critical");
   return {
     ranAt: new Date().toISOString(),
-    ok: checks.every((check) => check.count === 0),
+    ok: checks.every((check) => check.count === 0) && !diskCritical,
     elapsedMs: Math.round(performance.now() - started),
     checks,
+    disk,
   };
 }
 
@@ -862,14 +872,21 @@ export function healthRunIsStale(
   return nowMs - ran > STALE_MS;
 }
 
-/** زرد: اجرا نشده یا کهنه. قرمز: آخرین اجرا حداقل یک مشکل دارد. */
+/** زرد: اجرا نشده، کهنه، یا دیسک زیر ۱۵٪. قرمز: مشکل داده یا دیسک زیر ۸٪. */
 export function dashboardHealthAlerts(
   report: HealthReport | null,
   nowMs = Date.now(),
-): { yellow: boolean; red: boolean } {
+): { yellow: boolean; red: boolean; stale: boolean; diskWarn: boolean } {
+  const stale = healthRunIsStale(report, nowMs);
+  const diskWarn = Boolean(report?.disk?.volumes.some((item) => item.level === "warn"));
+  const diskCritical = Boolean(
+    report?.disk?.volumes.some((item) => item.level === "critical"),
+  );
   return {
-    yellow: healthRunIsStale(report, nowMs),
-    red: Boolean(report?.checks.some((check) => check.count > 0)),
+    yellow: stale || diskWarn,
+    red: Boolean(report?.checks.some((check) => check.count > 0)) || diskCritical,
+    stale,
+    diskWarn,
   };
 }
 
@@ -895,6 +912,13 @@ export function formatHealthReport(report: HealthReport): string {
     `نتیجه: ${report.ok ? "سالم" : "مشکل دارد"}`,
     "",
   ];
+  if (report.disk) {
+    for (const item of report.disk.volumes) lines.push(formatDiskVolume(item));
+    for (const item of report.disk.sections) {
+      lines.push(`حجم ${item.title}: ${formatByteSize(item.bytes)}`);
+    }
+    lines.push("");
+  }
   report.checks.forEach((check, index) => {
     lines.push(
       `${toFaDigits(index + 1)}. ${check.title} — ${toFaDigits(check.count)} (${toFaDigits(check.durationMs)} میلی‌ثانیه)`,
