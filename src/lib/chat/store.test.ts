@@ -272,6 +272,23 @@ describe("گفتگوی متنی", () => {
         .get();
       expect(delivered?.id ?? 0).toBeGreaterThan(0);
 
+      let senderSawTyping = false;
+      clientA.on("typing", () => {
+        senderSawTyping = true;
+      });
+      const typed = new Promise<number>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("typing timeout")), 4000);
+        clientB.on("typing", (event: { userId: number; active: boolean }) => {
+          if (event.userId !== a.id || !event.active) return;
+          clearTimeout(timer);
+          resolve(event.userId);
+        });
+      });
+      clientA.emit("typing", { conversationId: id, active: true });
+      expect(await typed).toBe(a.id);
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      expect(senderSawTyping).toBe(false);
+
       const closed = new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error("disconnect timeout")), 4000);
         clientA.on("disconnect", () => {
@@ -279,17 +296,26 @@ describe("گفتگوی متنی", () => {
           resolve();
         });
       });
-      const response = await fetch(`http://127.0.0.1:${port}/internal/disconnect`, {
-        method: "POST",
-        headers: {
-          authorization: "Bearer test-internal-secret",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ userId: a.id }),
-      });
-      expect(response.status).toBe(204);
+      db.update(schema.users).set({ isActive: false }).where(eq(schema.users.id, a.id)).run();
+      process.env.REALTIME_PORT = String(port);
+      const { bumpSessionVersion } = await import("@/lib/auth/user");
+      bumpSessionVersion(a.id);
       await closed;
+      const stale = connect(port, await createSessionToken(a.id, 1));
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("باید رد می‌شد")), 4000);
+        stale.on("connect", () => {
+          clearTimeout(timer);
+          reject(new Error("اتصال نباید برقرار شود"));
+        });
+        stale.on("connect_error", () => {
+          clearTimeout(timer);
+          stale.close();
+          resolve();
+        });
+      });
     } finally {
+      delete process.env.REALTIME_PORT;
       clientA.close();
       clientB.close();
       await new Promise<void>((resolve) => server.close(() => resolve()));
