@@ -3,6 +3,11 @@ export const changelog = [
   {
     "version": "منتشرنشده",
     "date": null,
+    "sections": []
+  },
+  {
+    "version": "1.2.5",
+    "date": "۱۴۰۵/۰۷/۱۶",
     "sections": [
       {
         "title": "رفع‌شده",
