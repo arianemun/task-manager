@@ -5,6 +5,7 @@ import { Mic } from "lucide-react";
 import { MediaPermissionDrawer } from "@/components/permissions/media-permission-drawer";
 import { fa } from "@/lib/i18n/fa";
 import { CHAT_VOICE_MAX_MS } from "@/lib/chat/types";
+import { bindNoCallout, capturePointer } from "@/lib/chat/no-callout";
 import { voiceGesture, type VoiceGesture } from "@/lib/chat/voice-gesture";
 import { getPermissionStatus, markSessionMedia, sessionMediaGranted } from "@/lib/permissions/browser";
 import {
@@ -57,6 +58,8 @@ export function VoiceHold({
   const hint = useRef<PermissionStatus>("unknown");
   const [gate, setGate] = useState<PermissionStatus | null>(null);
   const [ios, setIos] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   function stopTracks() {
     stream.current?.getTracks().forEach((track) => track.stop());
@@ -89,6 +92,23 @@ export function VoiceHold({
   }, []);
 
   useEffect(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+    return bindNoCallout(button);
+  }, []);
+
+  useEffect(() => {
+    const recording = phase === "recording" || phase === "cancel" || phase === "locked";
+    const form = rootRef.current?.closest("form");
+    form?.toggleAttribute("data-recording", recording);
+    document.body.classList.toggle("chat-recording", recording);
+    return () => {
+      form?.removeAttribute("data-recording");
+      document.body.classList.remove("chat-recording");
+    };
+  }, [phase]);
+
+  useEffect(() => {
     if (phase === "idle") return;
     const timer = window.setInterval(() => setElapsed(Date.now() - started.current), 200);
     return () => window.clearInterval(timer);
@@ -101,6 +121,7 @@ export function VoiceHold({
     onError("");
     const button = event.currentTarget;
     const pointerId = event.pointerId;
+    capturePointer(button, pointerId);
     const token = session.current + 1;
     session.current = token;
     if (!shouldCaptureMedia(hint.current, sessionMediaGranted("microphone"))) {
@@ -147,11 +168,6 @@ export function VoiceHold({
       rec.start();
       setPhase("recording");
       setElapsed(0);
-      try {
-        button.setPointerCapture(pointerId);
-      } catch {
-        // The system sheet can end the pointer before capture.
-      }
       limit.current = window.setTimeout(() => finish(true), CHAT_VOICE_MAX_MS);
     } catch (error) {
       stopTracks();
@@ -169,7 +185,7 @@ export function VoiceHold({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={rootRef}>
       {phase !== "idle" ? (
         <div className="bg-card absolute bottom-full end-0 z-10 mb-2 flex w-64 items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
           <span>{clock(elapsed)}</span>
@@ -189,7 +205,8 @@ export function VoiceHold({
       ) : null}
       <button
         type="button"
-        className="border-input inline-flex size-11 shrink-0 items-center justify-center rounded-md border md:size-10"
+        ref={buttonRef}
+        className="chat-hold border-input inline-flex size-11 shrink-0 items-center justify-center rounded-md border md:size-10"
         aria-label={phase === "locked" ? fa.chat.voiceLocked : fa.chat.holdToRecord}
         onContextMenu={(event) => event.preventDefault()}
         onPointerDown={(event) => void begin(event)}
