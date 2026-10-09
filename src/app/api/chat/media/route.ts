@@ -4,6 +4,7 @@ import { authErrorResponse } from "@/lib/auth/http";
 import { requireUser } from "@/lib/auth/user";
 import { ChatError } from "@/lib/chat/errors";
 import { createMediaMessage, createVoiceMessage } from "@/lib/chat/store";
+import { requestChatFanout } from "@/lib/realtime/notify";
 import { CHAT_VIDEO_MAX_BYTES, CHAT_VOICE_MAX_BYTES } from "@/lib/chat/types";
 
 const mediaFields = z.object({
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
           clientId,
           bytes,
         });
+    requestChatFanout(message);
     return NextResponse.json({ message });
   } catch (error) {
     const auth = authErrorResponse(error);

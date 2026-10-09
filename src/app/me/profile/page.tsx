@@ -3,6 +3,7 @@ import { AppCredit } from "@/components/layout/app-credit";
 import { AvatarForm } from "@/components/me/avatar-form";
 import { ChangePasswordDialog } from "@/components/me/change-password-dialog";
 import { PermissionSettings } from "@/components/permissions/permission-settings";
+import { PushAccount } from "@/components/push/push-account";
 import { PageHeader } from "@/components/layout/page-header";
 import { Stack } from "@/components/layout/stack";
 import {
@@ -13,7 +14,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { notificationPreferences, users, NOTIFICATION_TYPES } from "@/db/schema";
+import { PUSH_ON_BY_DEFAULT } from "@/lib/push/policy";
+import { listPushDevices } from "@/lib/push/subscriptions";
 import { requireUserOrRedirect } from "@/lib/auth/redirect";
 import { fa } from "@/lib/i18n/fa";
 import { getNavBadges } from "@/server/queries/nav-badges";
@@ -26,6 +29,13 @@ export default async function MeProfilePage() {
   });
   const full = db.select().from(users).where(eq(users.id, user.id)).get();
   const unread = getNavBadges(user).unread;
+  const devices = listPushDevices(user.id);
+  const prefRows = db
+    .select()
+    .from(notificationPreferences)
+    .where(eq(notificationPreferences.userId, user.id))
+    .all();
+  const prefMap = new Map(prefRows.map((row) => [row.type, row.push]));
 
   return (
     <Stack className="overflow-x-hidden">
@@ -66,6 +76,28 @@ export default async function MeProfilePage() {
               </span>
             ) : null}
           </Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{fa.notifications.title}</CardTitle>
+          <CardDescription>{fa.push.quietHint}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PushAccount
+            devices={devices.map((device) => ({
+              endpoint: device.endpoint,
+              deviceLabel: device.deviceLabel,
+            }))}
+            quietStart={full?.quietHoursStart ?? "22:00"}
+            quietEnd={full?.quietHoursEnd ?? "07:00"}
+            types={NOTIFICATION_TYPES.map((type) => ({
+              id: type,
+              label: fa.notifications.types[type],
+              checked: prefMap.get(type) ?? PUSH_ON_BY_DEFAULT[type],
+            }))}
+          />
         </CardContent>
       </Card>
 

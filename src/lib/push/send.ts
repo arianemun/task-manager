@@ -22,6 +22,59 @@ function vapidConfig(): { subject: string; publicKey: string; privateKey: string
   return { subject, publicKey, privateKey };
 }
 
+export type WebPushResult = {
+  ok: boolean;
+  statusCode: number | null;
+  error: string | null;
+};
+
+export async function sendWebPush(input: {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  title: string;
+  body: string;
+  url: string;
+  tag?: string | null;
+  badge?: number;
+}): Promise<WebPushResult> {
+  if (!subscriptionHostAllowed(input.endpoint)) {
+    return { ok: false, statusCode: null, error: "مقصد اشتراک مجاز نیست" };
+  }
+  const keys = vapidConfig();
+  webpush.setVapidDetails(keys.subject, keys.publicKey, keys.privateKey);
+  const payload = JSON.stringify({
+    title: input.title,
+    body: input.body,
+    url: input.url,
+    tag: input.tag ?? null,
+    badge: input.badge ?? 0,
+  });
+  try {
+    const result = await webpush.sendNotification(
+      {
+        endpoint: input.endpoint,
+        keys: { p256dh: input.p256dh, auth: input.auth },
+      },
+      payload,
+      { TTL: 60 },
+    );
+    return {
+      ok: result.statusCode >= 200 && result.statusCode < 300,
+      statusCode: result.statusCode,
+      error: null,
+    };
+  } catch (error) {
+    const statusCode =
+      typeof error === "object" && error && "statusCode" in error &&
+      typeof error.statusCode === "number"
+        ? error.statusCode
+        : null;
+    const message = error instanceof Error ? error.message : "ارسال ناموفق";
+    return { ok: false, statusCode, error: message.slice(0, 300) };
+  }
+}
+
 export async function sendLabPush(input: {
   endpoint: string;
   p256dh: string;
@@ -70,6 +123,8 @@ export async function sendLabPush(input: {
         title: input.title,
         body: input.body,
         url: "/admin/push-lab",
+        tag: null,
+        badge: 0,
       }),
       input.mode === "proxy" ? { proxy, TTL: 60 } : { TTL: 60 },
     );

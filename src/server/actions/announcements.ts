@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { notifyAnnouncement } from "@/lib/notifications/store";
+import { enqueuePushesFor } from "@/lib/push/queue";
 import { userIdsInDepartments } from "@/lib/departments/membership";
 import { isAuthError } from "@/lib/auth/errors";
 import { requirePermission, requireUser } from "@/lib/auth/user";
@@ -107,7 +108,7 @@ export async function createAnnouncementAction(
       },
     });
 
-    notifyAnnouncement({
+    const notified = notifyAnnouncement({
       announcementId: row.id,
       authorId: actor.id,
       title: data.title,
@@ -116,6 +117,7 @@ export async function createAnnouncementAction(
       departmentId: data.departmentId,
       userIds: data.userIds,
     });
+    enqueuePushesFor(notified);
 
     revalidatePath("/admin/announcements");
     revalidatePath("/me/info");

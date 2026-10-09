@@ -11,6 +11,14 @@ import { ChatError } from "@/lib/chat/errors";
 import { allowTyping } from "@/lib/chat/rate-limit";
 import { CHAT_BODY_MAX } from "@/lib/chat/types";
 import { socketNotificationSchema } from "@/lib/notifications/types";
+import { deliverChatPush, processPushQueue, processQuietDigests } from "@/lib/push/queue";
+import {
+  collectChatAudience,
+  isSocketForeground,
+  SOCKET_PING_INTERVAL_MS,
+  SOCKET_PING_TIMEOUT_MS,
+  type SocketForeground,
+} from "@/lib/realtime/foreground";
 import {
   activeMemberIds,
   assertConversationMember,
@@ -58,6 +66,23 @@ const typingSchema = z.object({
 const readSchema = z.object({
   conversationId: z.number().int().positive(),
   messageId: z.number().int().positive(),
+});
+
+const focusSchema = z.object({
+  conversationId: z.number().int().positive().nullable(),
+});
+
+const chatFanoutSchema = z.object({
+  message: z
+    .object({
+      id: z.number().int().positive(),
+      conversationId: z.number().int().positive(),
+      senderId: z.number().int().positive(),
+      senderName: z.string(),
+      type: z.string(),
+      body: z.string().nullable(),
+    })
+    .passthrough(),
 });
 
 function readCookie(header: string | undefined, name: string): string | null {
@@ -128,6 +153,8 @@ export function startRealtimeServer(port: number): http.Server {
     .filter(Boolean);
 
   const io = new Server(httpServer, {
+    pingInterval: SOCKET_PING_INTERVAL_MS,
+    pingTimeout: SOCKET_PING_TIMEOUT_MS,
     cors: {
       origin(origin, callback) {
         if (!origin || allowed.length === 0 || allowed.includes(origin)) {
@@ -186,6 +213,28 @@ export function startRealtimeServer(port: number): http.Server {
         res.end();
         return;
       }
+      if (path === "/internal/chat-message" && req.method === "POST") {
+        const parsed = chatFanoutSchema.safeParse(body);
+        if (!parsed.success) {
+          res.statusCode = 400;
+          res.end();
+          return;
+        }
+        const message = parsed.data.message;
+        io.to(`conversation:${message.conversationId}`).emit("message:new", message);
+        const audience = pushAudience(message.conversationId);
+        deliverChatPush({
+          conversationId: message.conversationId,
+          senderId: message.senderId,
+          senderName: message.senderName,
+          type: message.type,
+          body: message.body,
+          ...audience,
+        });
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
       if (path === "/internal/notify" && req.method === "POST") {
         const parsed = socketNotificationSchema.safeParse(body);
         if (!parsed.success) {
@@ -218,8 +267,9 @@ export function startRealtimeServer(port: number): http.Server {
     next();
   });
 
-  const onlineCounts = new Map<number, number>();
+  const connectedCounts = new Map<number, number>();
   const offlineTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  const shownOnline = new Set<number>();
 
   function emitReceipt(conversationId: number) {
     io.to(`conversation:${conversationId}`).emit("receipt", {
@@ -228,32 +278,84 @@ export function startRealtimeServer(port: number): http.Server {
     });
   }
 
-  function noteOnline(id: number) {
-    const next = (onlineCounts.get(id) ?? 0) + 1;
-    onlineCounts.set(id, next);
+  function touchLastSeen(id: number, now = Date.now()) {
+    db.update(users).set({ lastSeenAt: new Date(now) }).where(eq(users.id, id)).run();
+  }
+
+  function socketForeground(socket: { data: Record<string, unknown> }): SocketForeground {
+    return {
+      userId: socket.data.userId as number,
+      backgrounded: Boolean(socket.data.backgrounded),
+      foregroundAt: (socket.data.foregroundAt as number | null) ?? null,
+      focusConversation: (socket.data.focusConversation as number | null) ?? null,
+    };
+  }
+
+  function userIsForeground(id: number, now = Date.now()): boolean {
+    for (const socket of io.sockets.sockets.values()) {
+      if ((socket.data.userId as number) !== id) continue;
+      if (isSocketForeground(socketForeground(socket), now)) return true;
+    }
+    return false;
+  }
+
+  function foregroundIds(now = Date.now()): number[] {
+    return collectChatAudience(
+      [...io.sockets.sockets.values()].map((socket) => socketForeground(socket)),
+      -1,
+      now,
+    ).foregroundUserIds;
+  }
+
+  function syncPresence(id: number, now = Date.now()) {
+    if (userIsForeground(id, now)) {
+      const pending = offlineTimers.get(id);
+      if (pending) clearTimeout(pending);
+      offlineTimers.delete(id);
+      if (!shownOnline.has(id)) {
+        shownOnline.add(id);
+        io.emit("presence", { userId: id, online: true });
+      }
+      return;
+    }
+    if ((connectedCounts.get(id) ?? 0) === 0) {
+      if (!shownOnline.has(id) || offlineTimers.has(id)) return;
+      const wait = Number(process.env.PRESENCE_OFFLINE_MS || 15_000);
+      const timer = setTimeout(() => {
+        offlineTimers.delete(id);
+        if ((connectedCounts.get(id) ?? 0) === 0 && !userIsForeground(id)) {
+          shownOnline.delete(id);
+          touchLastSeen(id);
+          io.emit("presence", { userId: id, online: false });
+        }
+      }, wait);
+      offlineTimers.set(id, timer);
+      return;
+    }
     const pending = offlineTimers.get(id);
     if (pending) clearTimeout(pending);
     offlineTimers.delete(id);
-    if (next === 1) io.emit("presence", { userId: id, online: true });
+    if (!shownOnline.has(id)) return;
+    shownOnline.delete(id);
+    touchLastSeen(id, now);
+    io.emit("presence", { userId: id, online: false });
   }
 
-  function noteOffline(id: number) {
-    const next = Math.max(0, (onlineCounts.get(id) ?? 1) - 1);
-    onlineCounts.set(id, next);
-    if (next > 0) return;
-    const wait = Number(process.env.PRESENCE_OFFLINE_MS || 15_000);
-    const timer = setTimeout(() => {
-      offlineTimers.delete(id);
-      if ((onlineCounts.get(id) ?? 0) === 0) {
-        io.emit("presence", { userId: id, online: false });
-      }
-    }, wait);
-    offlineTimers.set(id, timer);
+  function pushAudience(conversationId: number) {
+    const audience = collectChatAudience(
+      [...io.sockets.sockets.values()].map((socket) => socketForeground(socket)),
+      conversationId,
+      Date.now(),
+    );
+    return {
+      foregroundUserIds: audience.foregroundUserIds,
+      viewingUserIds: audience.viewingUserIds,
+    };
   }
 
   function deliverToOnline(conversationId: number, messageId: number, senderId: number) {
     for (const memberId of activeMemberIds(conversationId)) {
-      if (memberId !== senderId && (onlineCounts.get(memberId) ?? 0) > 0) {
+      if (memberId !== senderId && (connectedCounts.get(memberId) ?? 0) > 0) {
         markDelivered(memberId, conversationId, messageId);
       }
     }
@@ -266,18 +368,44 @@ export function startRealtimeServer(port: number): http.Server {
     for (const id of conversationIdsForUser(userId)) {
       socket.join(`conversation:${id}`);
     }
-    noteOnline(userId);
-    socket.emit(
-      "presence:snapshot",
-      [...onlineCounts.entries()].filter(([, count]) => count > 0).map(([id]) => id),
-    );
+    socket.data.backgrounded = true;
+    socket.data.foregroundAt = null;
+    socket.data.focusConversation = null;
+    connectedCounts.set(userId, (connectedCounts.get(userId) ?? 0) + 1);
+    socket.emit("presence:snapshot", foregroundIds());
 
     const timer = setInterval(() => {
       if (!sessionStillValid(userId, sessionVersion)) socket.disconnect(true);
     }, 5 * 60 * 1000);
     socket.on("disconnect", () => {
       clearInterval(timer);
-      noteOffline(userId);
+      connectedCounts.set(userId, Math.max(0, (connectedCounts.get(userId) ?? 1) - 1));
+      syncPresence(userId);
+    });
+
+    socket.on("presence:foreground", () => {
+      socket.data.backgrounded = false;
+      socket.data.foregroundAt = Date.now();
+      syncPresence(userId);
+    });
+
+    socket.on("presence:background", () => {
+      socket.data.backgrounded = true;
+      syncPresence(userId);
+    });
+
+    socket.on("conversation:focus", (payload) => {
+      const parsed = focusSchema.safeParse(payload);
+      if (!parsed.success) return;
+      const conversationId = parsed.data.conversationId;
+      if (conversationId) {
+        try {
+          assertConversationMember(conversationId, userId);
+        } catch {
+          return;
+        }
+      }
+      socket.data.focusConversation = conversationId;
     });
 
     socket.on("conversation:watch", (payload, ack) => {
@@ -299,6 +427,14 @@ export function startRealtimeServer(port: number): http.Server {
         const message = sendTextMessage({ userId, ...parsed.data });
         deliverToOnline(message.conversationId, message.id, userId);
         io.to(`conversation:${message.conversationId}`).emit("message:new", message);
+        deliverChatPush({
+          conversationId: message.conversationId,
+          senderId: message.senderId,
+          senderName: message.senderName,
+          type: message.type,
+          body: message.body,
+          ...pushAudience(message.conversationId),
+        });
         emitReceipt(message.conversationId);
         ack?.({ ok: true, message });
       } catch (error) {
@@ -378,6 +514,26 @@ export function startRealtimeServer(port: number): http.Server {
     });
   });
 
+  const presenceTimer = setInterval(() => {
+    const ids = new Set<number>();
+    for (const socket of io.sockets.sockets.values()) {
+      ids.add(socket.data.userId as number);
+    }
+    for (const id of ids) syncPresence(id);
+  }, 5000);
+
+  let pushBusy = false;
+  const pushTimer = setInterval(() => {
+    if (pushBusy) return;
+    pushBusy = true;
+    void processPushQueue()
+      .then(() => processQuietDigests())
+      .catch(() => undefined)
+      .finally(() => {
+        pushBusy = false;
+      });
+  }, 5000);
+
   const mediaTimer = setInterval(() => {
     void processNextMediaJob()
       .then((message) => {
@@ -386,7 +542,11 @@ export function startRealtimeServer(port: number): http.Server {
       })
       .catch(() => undefined);
   }, 2000);
-  httpServer.on("close", () => clearInterval(mediaTimer));
+  httpServer.on("close", () => {
+    clearInterval(mediaTimer);
+    clearInterval(pushTimer);
+    clearInterval(presenceTimer);
+  });
 
   httpServer.listen(port);
   return httpServer;

@@ -11,6 +11,7 @@ import {
   type PermissionStatus,
   type ShownPermissions,
 } from "@/lib/permissions/status";
+import { IosInstallGuide } from "@/components/permissions/ios-install-guide";
 import { toFaDigits } from "@/lib/utils";
 
 const title: Record<PermissionKind, string> = {
@@ -63,9 +64,7 @@ export function PermissionRows({
           {kind !== "notifications" && statuses[kind] === "ask-on-use" ? (
             <p className="text-muted-foreground text-sm leading-[1.7]">{fa.permissions.askOnUseHint}</p>
           ) : null}
-          {kind === "notifications" && install ? (
-            <p className="text-sm leading-[1.7]">{fa.permissions.iosInstall}</p>
-          ) : null}
+          {kind === "notifications" && install ? <IosInstallGuide /> : null}
           {statuses[kind] === "denied" ? (
             <p className="text-sm leading-[1.7]">{deniedText(kind, ios)}</p>
           ) : null}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { KeyRound, LogOut, UserRound } from "lucide-react";
 import { logoutAction } from "@/server/actions/auth";
+import { releaseDevicePush } from "@/lib/push/browser";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -65,7 +66,7 @@ export function UserMenu({ fullName, roleLabel, avatarPath }: Props) {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <form action={logoutAction} className="w-full">
+          <form action={logoutAction} className="w-full" onSubmit={() => releaseDevicePush()}>
             <button type="submit" className="flex w-full items-center gap-2">
               <LogOut className="size-4" />
               {fa.auth.logout}

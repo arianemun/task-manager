@@ -20,6 +20,8 @@ import {
 import { fa } from "@/lib/i18n/fa";
 import { toFaDigits } from "@/lib/utils";
 import { rerunDataHealthCheckAction } from "@/server/actions/data-health";
+import { chatPreviewHidden } from "@/lib/push/settings";
+import { savePushPreviewAction } from "@/server/actions/push-settings";
 
 export default async function AdminSettingsPage({
   searchParams,
@@ -34,6 +36,7 @@ export default async function AdminSettingsPage({
       : "reasons";
   const health = loadLastHealthReport();
   const disk = measureDiskSpace();
+  const hidePreview = chatPreviewHidden();
 
   return (
     <Stack>
@@ -144,8 +147,17 @@ export default async function AdminSettingsPage({
                 تنظیمات بیشتر در نسخه‌های بعدی اضافه می‌شود.
               </CardDescription>
             </CardHeader>
-            <CardContent className="text-muted-foreground text-sm">
-              فعلاً موردی برای پیکربندی نیست.
+            <CardContent>
+              <form action={savePushPreviewAction} className="space-y-3 text-sm leading-[1.7]">
+                <label className="flex min-h-11 items-start gap-2">
+                  <input type="checkbox" name="hide" defaultChecked={hidePreview} className="mt-1" />
+                  <span>
+                    <span className="font-medium">{fa.push.hidePreview}</span>
+                    <span className="text-muted-foreground block">{fa.push.hidePreviewHint}</span>
+                  </span>
+                </label>
+                <Button type="submit">{fa.common.save}</Button>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>

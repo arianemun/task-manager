@@ -152,6 +152,17 @@ export const fa = {
     openAll: "همه اعلان‌ها",
     previous: "قبلی",
     next: "بعدی",
+    types: {
+      "chat.message": "پیام گفتگو",
+      "chat.mention": "اشاره در گفتگو",
+      "announcement.new": "اطلاعیه",
+      "task.assigned": "کار تازه",
+      "task.daily_digest": "خلاصهٔ امروز",
+      "task.due_soon": "نزدیک شدن مهلت",
+      "task.overdue": "گذشتن مهلت",
+      "task.manager_summary": "خلاصهٔ مدیر",
+      "system.data_check_failed": "خطای سلامت داده",
+    },
   },
 
   status: {
@@ -316,6 +327,31 @@ export const fa = {
       camera:
         "مرورگر دوباره نمی‌پرسد. در Android Chrome آیکن قفل کنار آدرس را بزنید، یا Site settings را باز کنید، و Camera را Allow کنید.",
     },
+  },
+
+  push: {
+    installTitle: "برای دریافت اعلان، برنامه را به صفحهٔ اصلی اضافه کنید",
+    installSteps: [
+      "دکمهٔ Share را بزنید",
+      "Add to Home Screen را انتخاب کنید",
+      "Open as Web App را روشن بگذارید",
+      "برنامه را فقط از آیکن صفحهٔ اصلی باز کنید",
+    ],
+    vpn: "با VPN روشن برنامه باز نمی‌شود، چون سرور ایران اتصال از IP خارجی را نمی‌پذیرد. در تنظیمات VPN دامنهٔ task.khanemadari.com یا سایت‌های ایرانی را مستقیم (Direct) بگذارید: Hiddify، v2rayNG، NekoBox، Clash، v2rayN، و در آیفون Shadowrocket یا Streisand یا V2Box. اگر این گزینه نیست، VPN را خاموش کنید.",
+    devices: "دستگاه‌های اعلان",
+    noDevices: "هنوز دستگاهی ثبت نشده. بعد از اجازهٔ اعلان، با باز شدن برنامه ثبت می‌شود.",
+    removeDevice: "حذف",
+    test: "ارسال اعلان آزمایشی",
+    testSent: "اعلان آزمایشی فرستاده شد",
+    testFailed: "ارسال آزمایشی انجام نشد",
+    quiet: "ساعات سکوت",
+    quietHint: "به وقت تهران. اعلان‌های مهم در این ساعت هم می‌رسند.",
+    from: "از",
+    until: "تا",
+    types: "انواع اعلان",
+    saved: "ذخیره شد",
+    hidePreview: "متن پیام چت در اعلان نشان داده نشود",
+    hidePreviewHint: "به‌جای متن، «پیام جدید» می‌آید. نوع فایل (صدا، عکس، ویدیو) همچنان مشخص است.",
   },
 
   about: {

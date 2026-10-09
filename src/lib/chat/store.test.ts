@@ -211,6 +211,17 @@ describe("گفتگوی متنی", () => {
     });
     try {
       await Promise.all([waitConnect(clientA), waitConnect(clientB)]);
+      const online = new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("online timeout")), 4000);
+        clientB.on("presence", (event: { userId: number; online: boolean }) => {
+          if (event.userId === a.id && event.online) {
+            clearTimeout(timer);
+            resolve();
+          }
+        });
+      });
+      clientA.emit("presence:foreground");
+      await online;
       clientA.disconnect();
       const early = await Promise.race([
         offline.then(() => "offline"),
@@ -221,6 +232,82 @@ describe("گفتگوی متنی", () => {
     } finally {
       delete process.env.PRESENCE_OFFLINE_MS;
       clientA.close();
+      clientB.close();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it("پس‌زمینه Push می‌گیرد و جلوی چشم بودن جلوی Push را می‌گیرد", async () => {
+    const { a, b } = await seedPair();
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const store = await import("@/lib/chat/store");
+    const { createSessionToken } = await import("@/lib/auth/jwt");
+    const { startRealtimeServer } = await import("../../../realtime/server");
+    const id = store.createDirectConversation(a.id, b.id);
+    const server = startRealtimeServer(0);
+    await new Promise<void>((resolve) => server.once("listening", () => resolve()));
+    const port = (server.address() as AddressInfo).port;
+    const clientA = connect(port, await createSessionToken(a.id, 1));
+    const clientA2 = connect(port, await createSessionToken(a.id, 1));
+    const clientB = connect(port, await createSessionToken(b.id, 1));
+    function send(body: string) {
+      return new Promise<void>((resolve, reject) => {
+        clientB.emit(
+          "message:send",
+          { conversationId: id, body, clientId: body },
+          (ack: { ok?: boolean; error?: string }) => {
+            if (ack?.ok) resolve();
+            else reject(new Error(ack?.error || "ارسال نشد"));
+          },
+        );
+      });
+    }
+    function waitPresence(online: boolean) {
+      return new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("presence timeout")), 4000);
+        const onPresence = (event: { userId: number; online: boolean }) => {
+          if (event.userId !== a.id || event.online !== online) return;
+          clearTimeout(timer);
+          clientB.off("presence", onPresence);
+          resolve();
+        };
+        clientB.on("presence", onPresence);
+      });
+    }
+    function countForA() {
+      return db
+        .select()
+        .from(schema.notifications)
+        .where(eq(schema.notifications.userId, a.id))
+        .all().length;
+    }
+    try {
+      await Promise.all([waitConnect(clientA), waitConnect(clientA2), waitConnect(clientB)]);
+      const online = waitPresence(true);
+      clientA.emit("presence:foreground");
+      await online;
+      clientA.emit("conversation:focus", { conversationId: id });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await send("روی همان گفتگو");
+      expect(countForA()).toBe(0);
+
+      const away = waitPresence(false);
+      clientA.emit("presence:background");
+      await away;
+      await send("در پس‌زمینه");
+      expect(countForA()).toBe(1);
+      const seen = db.select().from(schema.users).where(eq(schema.users.id, a.id)).get();
+      expect(seen?.lastSeenAt).toBeTruthy();
+
+      const back = waitPresence(true);
+      clientA2.emit("presence:foreground");
+      await back;
+      await send("دستگاه دیگر جلو است");
+      expect(countForA()).toBe(1);
+    } finally {
+      clientA.close();
+      clientA2.close();
       clientB.close();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }

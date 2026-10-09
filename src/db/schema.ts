@@ -125,6 +125,8 @@ export const users = sqliteTable(
     /** ساعات سکوت اعلان به وقت تهران، HH:mm. پیش‌فرض ۲۲:۰۰ تا ۰۷:۰۰ */
     quietHoursStart: text("quiet_hours_start").notNull().default("22:00"),
     quietHoursEnd: text("quiet_hours_end").notNull().default("07:00"),
+    /** آخرین باری که از جلوی چشم خارج شد یا اتصال قطع‌شده آفلاین اعلام شد */
+    lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -667,6 +669,8 @@ export const notifications = sqliteTable(
     entityType: text("entity_type"),
     entityId: integer("entity_id"),
     groupKey: text("group_key"),
+    /** تعداد پیام‌های جمع‌شده در یک اعلان چت */
+    bundleCount: integer("bundle_count").notNull().default(1),
     priority: text("priority")
       .$type<NotificationPriority>()
       .notNull()
@@ -695,8 +699,12 @@ export const notificationDeliveries = sqliteTable(
     attempts: integer("attempts").notNull().default(0),
     lastError: text("last_error"),
     sentAt: integer("sent_at", { mode: "timestamp_ms" }),
+    nextAttemptAt: integer("next_attempt_at", { mode: "timestamp_ms" }),
   },
-  (t) => [index("notification_deliveries_notification_idx").on(t.notificationId)],
+  (t) => [
+    index("notification_deliveries_notification_idx").on(t.notificationId),
+    index("notification_deliveries_push_queue_idx").on(t.channel, t.status, t.nextAttemptAt),
+  ],
 );
 
 export const pushSubscriptions = sqliteTable(
@@ -716,6 +724,7 @@ export const pushSubscriptions = sqliteTable(
       .default(sql`(unixepoch() * 1000)`),
     lastSuccessAt: integer("last_success_at", { mode: "timestamp_ms" }),
     failedCount: integer("failed_count").notNull().default(0),
+    disabledAt: integer("disabled_at", { mode: "timestamp_ms" }),
   },
   (t) => [
     uniqueIndex("push_subscriptions_endpoint_unique").on(t.endpoint),

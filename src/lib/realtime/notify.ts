@@ -5,12 +5,12 @@ function endpoint(path: string): string | null {
   return `http://127.0.0.1:${port}${path}`;
 }
 
-function post(path: string, body: unknown): void {
+function post(path: string, body: unknown, timeoutMs = 800): void {
   const url = endpoint(path);
   const secret = process.env.INTERNAL_SECRET;
   if (!url || !secret) return;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 800);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   void fetch(url, {
     method: "POST",
     headers: {
@@ -30,6 +30,17 @@ export function requestSocketDisconnect(userId: number): void {
 
 export function requestSocketJoin(conversationId: number, userIds: number[]): void {
   post("/internal/join", { conversationId, userIds });
+}
+
+export function requestChatFanout(message: {
+  id: number;
+  conversationId: number;
+  senderId: number;
+  senderName: string;
+  type: string;
+  body: string | null;
+}): void {
+  post("/internal/chat-message", { message }, 2000);
 }
 
 export function requestSocketNotify(

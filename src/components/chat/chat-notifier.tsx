@@ -13,8 +13,26 @@ export function ChatNotifier({ userId }: { userId: number }) {
 
   useEffect(() => {
     const socket = chatSocket();
+    const sendFocus = () => {
+      const match = /^\/chat\/(\d+)$/.exec(pathname);
+      const visible = document.visibilityState === "visible";
+      socket.emit("conversation:focus", {
+        conversationId: visible && match ? Number(match[1]) : null,
+      });
+    };
+    sendFocus();
+    document.addEventListener("visibilitychange", sendFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", sendFocus);
+      socket.emit("conversation:focus", { conversationId: null });
+    };
+  }, [pathname]);
+
+  useEffect(() => {
+    const socket = chatSocket();
     const onMessage = (message: ChatMessage) => {
       if (message.senderId === userId) return;
+      if (document.visibilityState !== "visible") return;
       if (pathname === `/chat/${message.conversationId}`) return;
       toast(message.senderName, {
         description:

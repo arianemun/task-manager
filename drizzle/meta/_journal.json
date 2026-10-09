@@ -134,6 +134,20 @@
       "when": 1791479562067,
       "tag": "0018_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1791492000000,
+      "tag": "0019_push_queue",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1791538000000,
+      "tag": "0020_last_seen",
+      "breakpoints": true
     }
   ]
 }

@@ -74,6 +74,31 @@ export function NotificationBell({
   const [items, setItems] = useState(initialItems);
 
   useEffect(() => {
+    setUnread(initialUnread);
+    setItems(initialItems);
+  }, [initialUnread, initialItems]);
+
+  useEffect(() => {
+    const apply = () => {
+      const nav = navigator as Navigator & {
+        setAppBadge?: (count: number) => Promise<void>;
+        clearAppBadge?: () => Promise<void>;
+      };
+      if (unread > 0 && nav.setAppBadge) {
+        void nav.setAppBadge(unread).catch(() => undefined);
+      } else if (nav.clearAppBadge) {
+        void nav.clearAppBadge().catch(() => undefined);
+      }
+    };
+    apply();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") apply();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [unread]);
+
+  useEffect(() => {
     const media = window.matchMedia("(max-width: 767px)");
     const apply = () => setMobile(media.matches);
     apply();

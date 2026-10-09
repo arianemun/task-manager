@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
+import { AppPresence } from "@/components/chat/app-presence";
 import { ChatNotifier } from "@/components/chat/chat-notifier";
 import { PermissionPrep } from "@/components/permissions/permission-prep";
+import { PushSync } from "@/components/push/push-sync";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { AppSidebar } from "@/components/layout/app-sidebar";
@@ -73,6 +75,8 @@ export async function AppFrame({
         data-has-bottom-nav={staffMobile ? "" : undefined}
       >
         <ChatNotifier userId={user.id} />
+        <AppPresence />
+        <PushSync />
         <PermissionPrep
           snoozeUntil={snooze?.until?.getTime() ?? null}
           setupCompleted={snooze?.setupCompleted ?? false}

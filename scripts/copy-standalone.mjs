@@ -28,6 +28,15 @@ if (!fs.existsSync(standalone)) {
 copyDir(staticSrc, path.join(standalone, ".next", "static"));
 copyDir(publicSrc, path.join(standalone, "public"));
 
+const swFile = path.join(standalone, "public", "sw.js");
+if (fs.existsSync(swFile)) {
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  const stamp = `${pkg.version}-${Date.now()}`;
+  const source = fs.readFileSync(swFile, "utf8");
+  fs.writeFileSync(swFile, source.replace(/const SW_VERSION = "[^"]*";/, `const SW_VERSION = "${stamp}";`));
+  console.log("✓ service worker", stamp);
+}
+
 for (const name of [".env", ".env.production", ".env.local"]) {
   const src = path.join(root, name);
   if (!fs.existsSync(src)) continue;
