@@ -22,6 +22,8 @@ import { toFaDigits } from "@/lib/utils";
 import { rerunDataHealthCheckAction } from "@/server/actions/data-health";
 import { chatPreviewHidden } from "@/lib/push/settings";
 import { savePushPreviewAction } from "@/server/actions/push-settings";
+import { loadTaskNotifySettings } from "@/lib/notifications/task-settings";
+import { saveTaskNotifySettingsAction } from "@/server/actions/task-notify-settings";
 
 export default async function AdminSettingsPage({
   searchParams,
@@ -31,12 +33,16 @@ export default async function AdminSettingsPage({
   await requireUserOrRedirect({ roles: ["ADMIN"], forbiddenPath: "/admin" });
   const params = await searchParams;
   const tab =
-    params.tab === "health" || params.tab === "general" || params.tab === "reasons"
+    params.tab === "health" ||
+    params.tab === "general" ||
+    params.tab === "reasons" ||
+    params.tab === "notifications"
       ? params.tab
       : "reasons";
   const health = loadLastHealthReport();
   const disk = measureDiskSpace();
   const hidePreview = chatPreviewHidden();
+  const taskNotify = loadTaskNotifySettings();
 
   return (
     <Stack>
@@ -55,6 +61,9 @@ export default async function AdminSettingsPage({
           </TabsTrigger>
           <TabsTrigger value="general" className="shrink-0">
             عمومی
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="shrink-0">
+            {fa.taskNotify.tab}
           </TabsTrigger>
         </TabsList>
         <TabsContent value="reasons" className="mt-4">
@@ -155,6 +164,59 @@ export default async function AdminSettingsPage({
                     <span className="font-medium">{fa.push.hidePreview}</span>
                     <span className="text-muted-foreground block">{fa.push.hidePreviewHint}</span>
                   </span>
+                </label>
+                <Button type="submit">{fa.common.save}</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="notifications" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{fa.taskNotify.title}</CardTitle>
+              <CardDescription>{fa.taskNotify.hint}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action={saveTaskNotifySettingsAction} className="space-y-4 text-sm">
+                <label className="flex min-h-11 flex-wrap items-center gap-3">
+                  {fa.taskNotify.digest}
+                  <input
+                    name="digestTime"
+                    type="time"
+                    defaultValue={taskNotify.digestTime}
+                    className="border-input bg-background h-11 rounded-md border px-2"
+                  />
+                </label>
+                <label className="flex min-h-11 flex-wrap items-center gap-3">
+                  {fa.taskNotify.dueSoon}
+                  <input
+                    name="dueSoonMinutes"
+                    type="number"
+                    min={1}
+                    max={240}
+                    defaultValue={taskNotify.dueSoonMinutes}
+                    className="border-input bg-background h-11 w-24 rounded-md border px-2"
+                  />
+                </label>
+                <label className="flex min-h-11 flex-wrap items-center gap-3">
+                  {fa.taskNotify.overdue}
+                  <input
+                    name="overdueAfterMinutes"
+                    type="number"
+                    min={1}
+                    max={240}
+                    defaultValue={taskNotify.overdueAfterMinutes}
+                    className="border-input bg-background h-11 w-24 rounded-md border px-2"
+                  />
+                </label>
+                <label className="flex min-h-11 flex-wrap items-center gap-3">
+                  {fa.taskNotify.summary}
+                  <input
+                    name="summaryTime"
+                    type="time"
+                    defaultValue={taskNotify.summaryTime}
+                    className="border-input bg-background h-11 rounded-md border px-2"
+                  />
                 </label>
                 <Button type="submit">{fa.common.save}</Button>
               </form>

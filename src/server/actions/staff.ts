@@ -23,6 +23,7 @@ import {
   requireUser,
 } from "@/lib/auth/user";
 import { todayTehran } from "@/lib/dates";
+import { notifyDepartmentJoin } from "@/lib/notifications/task-notify";
 import { generateTempPassword } from "@/lib/password-gen";
 import {
   assertCanAssignRole,
@@ -114,6 +115,11 @@ function generateDepartmentTasks(userId: number, departmentIds: number[]) {
         to: today,
         skipCursorUpdate: true,
       });
+    }
+    try {
+      notifyDepartmentJoin(userId, departmentIds);
+    } catch {
+      /* اعلان نباید پیوستن به دپارتمان را متوقف کند */
     }
   }
 }

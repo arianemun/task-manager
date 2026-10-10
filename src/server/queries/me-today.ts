@@ -10,21 +10,19 @@ import {
   type OccurrenceStatus,
   type Priority,
 } from "@/db/schema";
+import { PRIORITY_RANK } from "@/lib/tasks/priority";
 import {
   addGregorianDays,
   compareGDate,
   diffGregorianDays,
+  dueAtTehranMs,
   endOfJalaliMonth,
   endOfJalaliWeek,
   todayTehran,
   type GDate,
 } from "@/lib/dates";
-
-const PRIORITY_RANK: Record<Priority, number> = {
-  HIGH: 0,
-  MEDIUM: 1,
-  LOW: 2,
-};
+import { isSettledOccurrence } from "@/lib/me/settled";
+import { isTaskVisibleAt, normalizeStartTime } from "@/lib/tasks/start-time";
 
 export type MeOccurrence = {
   id: number;
@@ -84,6 +82,7 @@ export function loadMeToday(userId: number) {
       editedAt: taskOccurrences.editedAt,
       completedByUserId: taskOccurrences.completedByUserId,
       completionMode: taskTemplates.completionMode,
+      startTime: taskTemplates.startTime,
       title: taskTemplates.title,
       description: taskTemplates.description,
       priority: taskTemplates.priority,
@@ -122,12 +121,28 @@ export function loadMeToday(userId: number) {
           .map((person) => [person.id, person.fullName] as const),
   );
 
+  const todayAll: MeOccurrence[] = [];
   const todayList: MeOccurrence[] = [];
   const weekList: MeOccurrence[] = [];
   const monthList: MeOccurrence[] = [];
   const excusedList: MeOccurrence[] = [];
+  const archiveList: MeOccurrence[] = [];
+  let nextRevealAt: number | null = null;
+
+  function place(list: MeOccurrence[], item: MeOccurrence) {
+    if (isSettledOccurrence(item.status)) archiveList.push(item);
+    else list.push(item);
+  }
 
   for (const r of rows) {
+    if (!isTaskVisibleAt(r.startTime)) {
+      const clock = normalizeStartTime(r.startTime);
+      if (clock) {
+        const at = dueAtTehranMs(today, clock);
+        if (nextRevealAt == null || at < nextRevealAt) nextRevealAt = at;
+      }
+      continue;
+    }
     const fulfilledByOther =
       r.status === "DONE_BY_PEER" ||
       (r.completedByUserId != null && r.completedByUserId !== userId);
@@ -175,25 +190,39 @@ export function loadMeToday(userId: number) {
     }
 
     if (r.periodKey.startsWith("D:") || r.periodKey.startsWith("O:")) {
-      todayList.push({ ...base, group: "today" });
+      const item = { ...base, group: "today" as const };
+      todayAll.push(item);
+      place(todayList, item);
     } else if (r.periodKey.startsWith("W:")) {
-      weekList.push({ ...base, group: "week", daysLeft: Math.max(0, diffGregorianDays(today, weekEnd)) });
+      place(weekList, {
+        ...base,
+        group: "week",
+        daysLeft: Math.max(0, diffGregorianDays(today, weekEnd)),
+      });
     } else if (r.periodKey.startsWith("M:")) {
-      monthList.push({
+      place(monthList, {
         ...base,
         group: "month",
         daysLeft: Math.max(0, diffGregorianDays(today, monthEnd)),
       });
     } else {
-      todayList.push({ ...base, group: "today" });
+      const item = { ...base, group: "today" as const };
+      todayAll.push(item);
+      place(todayList, item);
     }
   }
 
   todayList.sort(sortOcc);
   weekList.sort(sortOcc);
   monthList.sort(sortOcc);
+  archiveList.sort((a, b) => {
+    const doneA = a.completedAt?.getTime() ?? 0;
+    const doneB = b.completedAt?.getTime() ?? 0;
+    if (doneA !== doneB) return doneB - doneA;
+    return sortOcc(a, b);
+  });
 
-  const ownToday = todayList.filter((o) => !o.fulfilledByOther);
+  const ownToday = todayAll.filter((o) => !o.fulfilledByOther);
   const doneToday = ownToday.filter(
     (o) => o.status === "DONE" || o.status === "DONE_LATE",
   );
@@ -208,7 +237,7 @@ export function loadMeToday(userId: number) {
     .get();
 
   const allTodayExcused =
-    todayList.length === 0 &&
+    todayAll.length === 0 &&
     excusedList.some(
       (e) => e.periodKey.startsWith("D:") || e.periodKey.startsWith("O:"),
     );
@@ -218,6 +247,7 @@ export function loadMeToday(userId: number) {
     todayList,
     weekList,
     monthList,
+    archiveList,
     excusedList,
     progress: {
       done: progressDone,
@@ -226,6 +256,7 @@ export function loadMeToday(userId: number) {
     onLeave,
     isHoliday,
     showLeaveBanner: onLeave || (allTodayExcused && excusedList.length > 0),
+    nextRevealAt,
   };
 }
 

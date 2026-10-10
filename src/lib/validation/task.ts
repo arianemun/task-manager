@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { PRIORITIES } from "@/db/schema";
+import { normalizeTaskPriority } from "@/lib/tasks/priority";
 
 const gDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "تاریخ نامعتبر است");
 const weekday = z.number().int().min(0).max(6);
@@ -74,13 +76,19 @@ export const taskFormSchema = z
     title: z.string().trim().min(1, "عنوان الزامی است").max(200),
     description: z.string().trim().max(5000).optional().or(z.literal("")),
     categoryId: z.coerce.number().int().positive().nullable().optional(),
-    priority: z.enum(["LOW", "MEDIUM", "HIGH"]).default("MEDIUM"),
+    priority: z.preprocess(normalizeTaskPriority, z.enum(PRIORITIES)),
     requiresNote: z.boolean().default(false),
     requiresAttachment: z.boolean().default(false),
     skipHolidays: z.boolean().default(true),
     completionMode: z.enum(["INDIVIDUAL", "SHARED"]).default("INDIVIDUAL"),
     startDate: gDate,
     endDate: gDate.nullable().optional(),
+    startTime: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+      .nullable()
+      .optional()
+      .or(z.literal("")),
     dueTime: z
       .string()
       .regex(/^\d{2}:\d{2}$/)

@@ -1,7 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Bell, ClipboardList, Megaphone, MessageSquare } from "lucide-react";
+import {
+  AlarmClock,
+  AlertTriangle,
+  Bell,
+  CalendarDays,
+  ClipboardList,
+  Clock,
+  Megaphone,
+  MessageSquare,
+  PieChart,
+} from "lucide-react";
 import { chatTimeLabel } from "@/lib/chat/time";
 import type { NotificationItem } from "@/lib/notifications/types";
 import { fa } from "@/lib/i18n/fa";
@@ -9,15 +19,24 @@ import { cn } from "@/lib/utils";
 import { markNotificationReadAction } from "@/server/actions/notifications";
 
 function TypeIcon({ type }: { type: string }) {
-  const Icon = type.startsWith("chat.")
-    ? MessageSquare
-    : type.startsWith("announcement.")
-      ? Megaphone
-      : type.startsWith("task.")
-        ? ClipboardList
-        : type.startsWith("system.")
-          ? AlertTriangle
-          : Bell;
+  const Icon =
+    type === "task.assigned"
+      ? ClipboardList
+      : type === "task.daily_digest"
+        ? CalendarDays
+        : type === "task.due_soon"
+          ? Clock
+          : type === "task.overdue"
+            ? AlarmClock
+            : type === "task.manager_summary"
+              ? PieChart
+              : type.startsWith("chat.")
+                ? MessageSquare
+                : type.startsWith("announcement.")
+                  ? Megaphone
+                  : type.startsWith("system.")
+                    ? AlertTriangle
+                    : Bell;
   return <Icon className="text-muted-foreground size-5 shrink-0" />;
 }
 
@@ -53,6 +72,11 @@ export function NotificationRows({
                   {item.title}
                 </span>
                 <time className="text-muted-foreground shrink-0 text-xs">{chatTimeLabel(item.createdAt)}</time>
+              </span>
+              <span className="text-muted-foreground block truncate text-xs">
+                {item.type in fa.notifications.types
+                  ? fa.notifications.types[item.type as keyof typeof fa.notifications.types]
+                  : null}
               </span>
               <span className="text-muted-foreground block truncate text-sm">{item.body}</span>
             </span>

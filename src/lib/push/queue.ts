@@ -19,6 +19,7 @@ import {
   decidePush,
   inQuietHours,
   nextBackoff,
+  nextQuietEndMs,
   quietDigestCopy,
   quietPeriodEndMs,
   splitChatRecipients,
@@ -46,7 +47,7 @@ function preferencePush(userId: number, type: NotificationType): boolean | null 
   return row ? row.push : null;
 }
 
-function userQuiet(userId: number, now: Date): boolean {
+function userQuietClocks(userId: number): { start: string; end: string } | null {
   const row = db
     .select({
       start: users.quietHoursStart,
@@ -55,6 +56,11 @@ function userQuiet(userId: number, now: Date): boolean {
     .from(users)
     .where(eq(users.id, userId))
     .get();
+  return row ?? null;
+}
+
+function userQuiet(userId: number, now: Date): boolean {
+  const row = userQuietClocks(userId);
   if (!row) return false;
   return inQuietHours(now, row.start, row.end);
 }
@@ -89,6 +95,8 @@ export function enqueuePush(input: {
   type: NotificationType;
   priority: NotificationPriority;
   now?: number;
+  /** digest و summary در ساعات سکوت به پایان سکوت موکول می‌شوند. */
+  whenQuiet?: "skip" | "defer";
 }): "send" | "preference" | "quiet" {
   const now = input.now ?? Date.now();
   const decision = decidePush({
@@ -108,6 +116,22 @@ export function enqueuePush(input: {
       })
       .run();
     return decision;
+  }
+  if (decision === "quiet" && input.whenQuiet === "defer") {
+    const clocks = userQuietClocks(input.userId);
+    const end = clocks ? nextQuietEndMs(new Date(now), clocks.start, clocks.end) : null;
+    if (end != null) {
+      db.insert(notificationDeliveries)
+        .values({
+          notificationId: input.notificationId,
+          channel: "PUSH",
+          status: "PENDING",
+          attempts: 0,
+          nextAttemptAt: new Date(end),
+        })
+        .run();
+      return decision;
+    }
   }
   db.insert(notificationDeliveries)
     .values({

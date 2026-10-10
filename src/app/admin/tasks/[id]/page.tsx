@@ -89,6 +89,7 @@ export default async function EditTaskPage({ params }: Props) {
             startDate: t.startDate,
             endDate: t.endDate,
             dueTime: t.dueTime,
+            startTime: t.startTime,
             recurrenceType: t.recurrenceType,
             recurrenceConfig: (t.recurrenceConfig ?? {}) as Record<
               string,

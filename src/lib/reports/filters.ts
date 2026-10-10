@@ -1,4 +1,5 @@
-import type { Priority, RecurrenceType } from "@/db/schema";
+import { PRIORITIES, type Priority, type RecurrenceType } from "@/db/schema";
+import { normalizeTaskPriority } from "@/lib/tasks/priority";
 import {
   resolveReportRange,
   type RangeShortcut,
@@ -57,9 +58,14 @@ export function parseReportFilters(
     "MONTHLY",
     "CUSTOM",
   ];
-  const priorityWhitelist: Priority[] = ["LOW", "MEDIUM", "HIGH"];
   const rt = get("recurrenceType") as RecurrenceType | undefined;
-  const pr = get("priority") as Priority | undefined;
+  const rawPriority = get("priority");
+  const knownPriority =
+    rawPriority === "HIGH" ||
+    rawPriority === "MEDIUM" ||
+    rawPriority === "LOW" ||
+    (rawPriority != null && (PRIORITIES as readonly string[]).includes(rawPriority));
+  const pr = knownPriority ? normalizeTaskPriority(rawPriority) : null;
 
   return {
     shortcut: sc,
@@ -69,7 +75,7 @@ export function parseReportFilters(
     userId: num("userId"),
     categoryId: num("categoryId"),
     recurrenceType: rt && recurrenceWhitelist.includes(rt) ? rt : null,
-    priority: pr && priorityWhitelist.includes(pr) ? pr : null,
+    priority: pr && PRIORITIES.includes(pr) ? pr : null,
     q: (get("q") || "").trim().slice(0, 200),
     tab: get("tab") || "summary",
     granularity: gran === "week" || gran === "month" || gran === "day" ? gran : "day",

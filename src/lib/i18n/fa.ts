@@ -5,6 +5,8 @@ export const fa = {
   common: {
     loading: "در حال بارگذاری…",
     save: "ذخیره",
+    register: "ثبت",
+    registerAndNew: "ثبت و جدید",
     cancel: "انصراف",
     delete: "حذف",
     edit: "ویرایش",
@@ -64,6 +66,18 @@ export const fa = {
     ADMIN: "مدیر کل",
     MANAGER: "سرپرست",
     STAFF: "پرسنل",
+  },
+
+  tasks: {
+    startTime: "ساعت شروع",
+    startTimeHint:
+      "اختیاری و به وقت تهران. با رسیدن این ساعت کار برای پرسنل دیده می‌شود. در کار هفتگی و ماهانه هر روز همین ساعت ملاک است. اگر خالی باشد، از ابتدای روز دیده می‌شود.",
+  },
+
+  me: {
+    archive: "بایگانی",
+    archiveHint: "کارهایی که انجام‌شدن یا انجام‌نشدنشان ثبت شده",
+    noneOpen: "کار بازی نمانده",
   },
 
   nav: {
@@ -185,6 +199,7 @@ export const fa = {
     recurrenceConfig: "جزئیات تکرار",
     startDate: "شروع",
     endDate: "پایان",
+    startTime: "ساعت شروع",
     dueTime: "مهلت",
     completionMode: "نحوه تکمیل",
     userIds: "پرسنل",
@@ -212,9 +227,23 @@ export const fa = {
   },
 
   priority: {
-    LOW: "کم",
-    MEDIUM: "متوسط",
-    HIGH: "زیاد",
+    DO: "انجام فوری",
+    SCHEDULE: "برنامه‌ریزی",
+    DELEGATE: "واگذاری",
+    ELIMINATE: "کم‌اهمیت",
+  },
+
+  eisenhower: {
+    important: "مهم",
+    urgent: "فوری",
+    notUrgent: "غیرفوری",
+    hint: "نقطه را با ماوس بکشید و در خانهٔ مناسب رها کنید. با کلیک هم همان خانه انتخاب می‌شود.",
+    cells: {
+      DO: { title: "انجام شود", detail: "فوری و مهم" },
+      SCHEDULE: { title: "برنامه‌ریزی", detail: "مهم، غیرفوری" },
+      DELEGATE: { title: "واگذار شود", detail: "فوری، غیرمهم" },
+      ELIMINATE: { title: "حذف شود", detail: "غیرفوری و غیرمهم" },
+    },
   },
 
   recurrence: {
@@ -352,6 +381,23 @@ export const fa = {
     saved: "ذخیره شد",
     hidePreview: "متن پیام چت در اعلان نشان داده نشود",
     hidePreviewHint: "به‌جای متن، «پیام جدید» می‌آید. نوع فایل (صدا، عکس، ویدیو) همچنان مشخص است.",
+  },
+
+  taskNotify: {
+    tab: "اعلان‌ها",
+    title: "زمان اعلان کارها",
+    hint: "همه ساعت‌ها به وقت تهران است.",
+    digest: "خلاصهٔ صبح",
+    dueSoon: "دقیقه قبل از مهلت",
+    overdue: "دقیقه بعد از مهلت",
+    summary: "خلاصهٔ مدیر",
+    labTitle: "اجرای دستی اعلان کارها",
+    type: "نوع",
+    user: "کاربر",
+    preview: "پیش‌نمایش",
+    send: "ارسال واقعی",
+    willSend: "ارسال می‌شود",
+    willNotSend: "ارسال نمی‌شود",
   },
 
   about: {

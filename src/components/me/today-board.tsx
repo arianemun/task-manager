@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { CalendarOff, CheckCircle2, Inbox } from "lucide-react";
 import { TaskCard } from "@/components/me/task-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { fa } from "@/lib/i18n/fa";
 import { toFaDigits } from "@/lib/utils";
 import type { NotDoneReason } from "@/lib/settings/not-done-reasons";
 import type { MeOccurrence } from "@/server/queries/me-today";
@@ -22,6 +25,7 @@ type Props = {
   todayList: MeOccurrence[];
   weekList: MeOccurrence[];
   monthList: MeOccurrence[];
+  archiveList: MeOccurrence[];
   excusedList: MeOccurrence[];
   progress: { done: number; total: number };
   showLeaveBanner: boolean;
@@ -29,16 +33,20 @@ type Props = {
   streakCurrent: number;
   streakBest: number;
   pinned: PinnedAnnouncement[];
+  focusId?: number | null;
+  nextRevealAt?: number | null;
 };
 
 function Group({
   title,
   items,
   reasons,
+  focusId,
 }: {
   title: string;
   items: MeOccurrence[];
   reasons: NotDoneReason[];
+  focusId?: number | null;
 }) {
   if (items.length === 0) return null;
   return (
@@ -51,7 +59,7 @@ function Group({
       </h2>
       <div className="space-y-3">
         {items.map((o) => (
-          <TaskCard key={o.id} occ={o} reasons={reasons} />
+          <TaskCard key={o.id} occ={o} reasons={reasons} highlighted={o.id === focusId} />
         ))}
       </div>
     </section>
@@ -64,6 +72,7 @@ export function TodayBoard({
   todayList,
   weekList,
   monthList,
+  archiveList,
   excusedList,
   progress,
   showLeaveBanner,
@@ -71,12 +80,24 @@ export function TodayBoard({
   streakCurrent,
   streakBest,
   pinned,
+  focusId = null,
+  nextRevealAt = null,
 }: Props) {
-  const empty =
-    todayList.length === 0 &&
-    weekList.length === 0 &&
-    monthList.length === 0 &&
-    excusedList.length === 0;
+  const router = useRouter();
+  useEffect(() => {
+    if (!focusId) return;
+    document.getElementById(`occ-${focusId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusId]);
+  useEffect(() => {
+    if (!nextRevealAt) return;
+    const delay = nextRevealAt - Date.now();
+    if (delay <= 0) return;
+    const timer = setTimeout(() => router.refresh(), delay + 500);
+    return () => clearTimeout(timer);
+  }, [nextRevealAt, router]);
+  const openEmpty =
+    todayList.length === 0 && weekList.length === 0 && monthList.length === 0;
+  const empty = openEmpty && archiveList.length === 0 && excusedList.length === 0;
 
   const pct =
     progress.total > 0
@@ -158,9 +179,30 @@ export function TodayBoard({
           />
         ) : null}
 
-        <Group title="امروز" items={todayList} reasons={reasons} />
-        <Group title="این هفته" items={weekList} reasons={reasons} />
-        <Group title="این ماه" items={monthList} reasons={reasons} />
+        <Group title="امروز" items={todayList} reasons={reasons} focusId={focusId} />
+        <Group title="این هفته" items={weekList} reasons={reasons} focusId={focusId} />
+        <Group title="این ماه" items={monthList} reasons={reasons} focusId={focusId} />
+
+        {openEmpty && archiveList.length > 0 && !showLeaveBanner ? (
+          <p className="text-muted-foreground text-sm">{fa.me.noneOpen}</p>
+        ) : null}
+
+        {archiveList.length > 0 ? (
+          <section className="space-y-3">
+            <h2 className="text-muted-foreground border-b py-2 text-base font-semibold">
+              {fa.me.archive}
+              <span className="ms-2 text-sm font-normal tabular-nums">
+                ({toFaDigits(archiveList.length)})
+              </span>
+            </h2>
+            <p className="text-muted-foreground text-xs">{fa.me.archiveHint}</p>
+            <div className="space-y-3">
+              {archiveList.map((o) => (
+                <TaskCard key={o.id} occ={o} reasons={reasons} highlighted={o.id === focusId} />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {excusedList.length > 0 ? (
           <section className="space-y-2 opacity-70">

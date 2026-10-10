@@ -12,6 +12,7 @@ import { allowTyping } from "@/lib/chat/rate-limit";
 import { CHAT_BODY_MAX } from "@/lib/chat/types";
 import { socketNotificationSchema } from "@/lib/notifications/types";
 import { deliverChatPush, processPushQueue, processQuietDigests } from "@/lib/push/queue";
+import { runTaskNotificationJob } from "@/lib/notifications/task-notify";
 import {
   collectChatAudience,
   isSocketForeground,
@@ -534,6 +535,21 @@ export function startRealtimeServer(port: number): http.Server {
       });
   }, 5000);
 
+  let taskBusy = false;
+  const runTasks = () => {
+    if (taskBusy) return;
+    taskBusy = true;
+    try {
+      runTaskNotificationJob();
+    } catch {
+      /* دور بعد دوباره */
+    } finally {
+      taskBusy = false;
+    }
+  };
+  runTasks();
+  const taskTimer = setInterval(runTasks, 60_000);
+
   const mediaTimer = setInterval(() => {
     void processNextMediaJob()
       .then((message) => {
@@ -546,6 +562,7 @@ export function startRealtimeServer(port: number): http.Server {
     clearInterval(mediaTimer);
     clearInterval(pushTimer);
     clearInterval(presenceTimer);
+    clearInterval(taskTimer);
   });
 
   httpServer.listen(port);

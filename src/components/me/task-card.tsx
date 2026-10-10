@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,7 @@ import { ResponseSheet } from "@/components/me/response-sheet";
 type Props = {
   occ: MeOccurrence;
   reasons: NotDoneReason[];
+  highlighted?: boolean;
 };
 
 type LocalState = {
@@ -47,7 +49,8 @@ function statusBadgeVariant(
   }
 }
 
-export function TaskCard({ occ, reasons }: Props) {
+export function TaskCard({ occ, reasons, highlighted = false }: Props) {
+  const router = useRouter();
   const [local, setLocal] = useState<LocalState>({
     status: occ.status,
     note: occ.note,
@@ -122,6 +125,7 @@ export function TaskCard({ occ, reasons }: Props) {
         });
       }
       toast.success("ثبت شد");
+      router.refresh();
     });
   }
 
@@ -147,8 +151,10 @@ export function TaskCard({ occ, reasons }: Props) {
 
   return (
     <article
+      id={`occ-${occ.id}`}
       className={cn(
-        "space-y-3 rounded-xl border p-4 transition-all duration-300",
+        "scroll-mt-24 space-y-3 rounded-xl border p-4 transition-all duration-300",
+        highlighted && "ring-primary ring-2",
         responded && "bg-muted/20",
         justSaved && responded && "scale-[0.99] opacity-90",
         locked && "opacity-80",
@@ -178,9 +184,14 @@ export function TaskCard({ occ, reasons }: Props) {
                 {occ.categoryName}
               </span>
             ) : null}
-            {occ.priority === "HIGH" ? (
+            {occ.priority === "DO" ? (
               <Badge variant="danger" className="font-semibold">
-                {fa.priority.HIGH}
+                {fa.priority.DO}
+              </Badge>
+            ) : null}
+            {occ.priority === "DELEGATE" ? (
+              <Badge variant="warning" className="font-semibold">
+                {fa.priority.DELEGATE}
               </Badge>
             ) : null}
             {!responded ? (

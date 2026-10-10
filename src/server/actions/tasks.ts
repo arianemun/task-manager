@@ -23,6 +23,10 @@ import {
   generateForTemplate,
   removePendingOnUnassign,
 } from "@/server/services/occurrence-generate";
+import {
+  coveredAssigneeIds,
+  notifyTemplateAssignees,
+} from "@/lib/notifications/task-notify";
 import type { ActionResult } from "./auth";
 
 function parseJsonField<T>(raw: FormDataEntryValue | null, fallback: T): T {
@@ -40,7 +44,7 @@ function parseTaskForm(formData: FormData) {
     title: formData.get("title"),
     description: formData.get("description") ?? "",
     categoryId: formData.get("categoryId") || null,
-    priority: formData.get("priority") || "MEDIUM",
+    priority: formData.get("priority") || "SCHEDULE",
     requiresNote: formData.get("requiresNote") === "true",
     requiresAttachment: formData.get("requiresAttachment") === "true",
     skipHolidays: formData.get("skipHolidays") !== "false",
@@ -48,6 +52,7 @@ function parseTaskForm(formData: FormData) {
       formData.get("completionMode") === "SHARED" ? "SHARED" : "INDIVIDUAL",
     startDate: formData.get("startDate"),
     endDate: formData.get("endDate") || null,
+    startTime: formData.get("startTime") || null,
     dueTime: formData.get("dueTime") || null,
     userIds: parseJsonField<number[]>(formData.get("userIds"), []),
     departmentIds: parseJsonField<number[]>(formData.get("departmentIds"), []),
@@ -78,6 +83,7 @@ const TASK_AUDIT_FIELDS = [
   "recurrenceConfig",
   "startDate",
   "endDate",
+  "startTime",
   "dueTime",
   "completionMode",
   "userIds",
@@ -94,6 +100,7 @@ function taskAuditRecord(data: TaskFormInput) {
     recurrenceConfig: data.recurrenceConfig,
     startDate: data.startDate,
     endDate: data.endDate || null,
+    startTime: data.startTime || null,
     dueTime: data.dueTime || null,
     completionMode: data.completionMode,
     userIds: data.userIds,
@@ -166,7 +173,7 @@ function syncAssignments(
 export async function createTaskAction(
   _prev: ActionResult | null,
   formData: FormData,
-): Promise<ActionResult & { taskId?: number; recurrenceChangedHint?: string }> {
+): Promise<ActionResult & { taskId?: number; after?: "edit" | "new"; recurrenceChangedHint?: string }> {
   try {
     const actor = await requirePermission("tasks.create");
     const parsed = parseTaskForm(formData);
@@ -196,6 +203,7 @@ export async function createTaskAction(
         recurrenceConfig: data.recurrenceConfig,
         startDate: data.startDate,
         endDate: data.endDate || null,
+        startTime: data.startTime || null,
         dueTime: data.dueTime || null,
         isActive: true,
         createdBy: actor.id,
@@ -205,6 +213,11 @@ export async function createTaskAction(
 
     syncAssignments(row.id, data.userIds, data.departmentIds);
     generateForTemplate(row.id);
+    try {
+      notifyTemplateAssignees(row.id);
+    } catch {
+      /* اعلان نباید ساخت کار را متوقف کند */
+    }
 
     writeAuditLog({
       actorId: actor.id,
@@ -215,7 +228,11 @@ export async function createTaskAction(
     });
 
     revalidateTaskSurfaces(row.id);
-    return { ok: true, taskId: row.id };
+    return {
+      ok: true,
+      taskId: row.id,
+      after: formData.get("after") === "new" ? "new" : "edit",
+    };
   } catch (e) {
     return saveFailed(e);
   }
@@ -251,6 +268,9 @@ export async function updateTaskAction(
     assertAssigneeInScope(actor, data.userIds, data.departmentIds);
 
     const beforeAssignees = currentAssignees(id);
+    const beforeUsers = new Set(
+      coveredAssigneeIds(beforeAssignees.userIds, beforeAssignees.departmentIds),
+    );
     const recurrenceChanged =
       existing.recurrenceType !== data.recurrenceType ||
       JSON.stringify(existing.recurrenceConfig) !==
@@ -270,6 +290,7 @@ export async function updateTaskAction(
         recurrenceConfig: data.recurrenceConfig,
         startDate: data.startDate,
         endDate: data.endDate || null,
+        startTime: data.startTime || null,
         dueTime: data.dueTime || null,
         updatedAt: new Date(),
       })
@@ -278,6 +299,16 @@ export async function updateTaskAction(
 
     syncAssignments(id, data.userIds, data.departmentIds);
     generateForTemplate(id);
+    const addedUsers = coveredAssigneeIds(data.userIds, data.departmentIds).filter(
+      (userId) => !beforeUsers.has(userId),
+    );
+    if (addedUsers.length > 0) {
+      try {
+        notifyTemplateAssignees(id, addedUsers);
+      } catch {
+        /* اعلان نباید ویرایش کار را متوقف کند */
+      }
+    }
 
     writeAuditLog({
       actorId: actor.id,
@@ -294,6 +325,7 @@ export async function updateTaskAction(
           recurrenceConfig: existing.recurrenceConfig,
           startDate: existing.startDate,
           endDate: existing.endDate,
+          startTime: existing.startTime,
           dueTime: existing.dueTime,
           completionMode: existing.completionMode,
           userIds: beforeAssignees.userIds,
@@ -451,6 +483,7 @@ export async function bulkCreateTasksAction(
             recurrenceConfig: data.recurrenceConfig,
             startDate: data.startDate,
             endDate: data.endDate || null,
+            startTime: data.startTime || null,
             dueTime: data.dueTime || null,
             isActive: true,
             createdBy: actor.id,
@@ -459,6 +492,11 @@ export async function bulkCreateTasksAction(
           .get();
         syncAssignments(row.id, data.userIds, data.departmentIds);
         generateForTemplate(row.id);
+        try {
+          notifyTemplateAssignees(row.id);
+        } catch {
+          /* اعلان نباید ساخت گروهی را متوقف کند */
+        }
         writeAuditLog({
           actorId: actor.id,
           action: "task.create",

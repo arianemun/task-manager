@@ -155,3 +155,16 @@ export function quietPeriodEndMs(now: Date, start: string, end: string): number 
 export function quietDigestCopy(unread: number): string {
   return `${toFaDigits(unread)} پیام و اطلاعیه خوانده‌نشده`;
 }
+
+/** اگر الان داخل سکوت است، زمان پایان همین دوره. وگرنه null. */
+export function nextQuietEndMs(now: Date, start: string, end: string): number | null {
+  if (!inQuietHours(now, start, end)) return null;
+  const to = parseClock(end);
+  if (to == null) return null;
+  const { y, m, d } = tehranYmd(now);
+  const hh = Math.floor(to / 60);
+  const mm = to % 60;
+  let endMs = Date.UTC(y, m - 1, d, hh, mm) - TEHRAN_OFFSET_MS;
+  if (endMs <= now.getTime()) endMs += 86_400_000;
+  return endMs;
+}

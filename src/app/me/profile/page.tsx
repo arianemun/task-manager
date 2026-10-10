@@ -14,7 +14,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { db } from "@/db";
-import { notificationPreferences, users, NOTIFICATION_TYPES } from "@/db/schema";
+import { notificationPreferences, users } from "@/db/schema";
+import { notificationTypesForRole } from "@/lib/notifications/task-rules";
 import { PUSH_ON_BY_DEFAULT } from "@/lib/push/policy";
 import { listPushDevices } from "@/lib/push/subscriptions";
 import { requireUserOrRedirect } from "@/lib/auth/redirect";
@@ -92,7 +93,7 @@ export default async function MeProfilePage() {
             }))}
             quietStart={full?.quietHoursStart ?? "22:00"}
             quietEnd={full?.quietHoursEnd ?? "07:00"}
-            types={NOTIFICATION_TYPES.map((type) => ({
+            types={notificationTypesForRole(user.role).map((type) => ({
               id: type,
               label: fa.notifications.types[type],
               checked: prefMap.get(type) ?? PUSH_ON_BY_DEFAULT[type],

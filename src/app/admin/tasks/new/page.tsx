@@ -59,6 +59,7 @@ export default async function NewTaskPage({ searchParams }: Props) {
       startDate: t.startDate,
       endDate: t.endDate,
       dueTime: t.dueTime,
+      startTime: t.startTime,
       recurrenceType: t.recurrenceType,
       recurrenceConfig: (t.recurrenceConfig ?? {}) as Record<string, unknown>,
       userIds: detail.userIds,

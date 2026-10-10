@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AssigneePicker, type DeptOption, type StaffOption } from "@/components/tasks/assignee-picker";
+import { EisenhowerMatrix } from "@/components/tasks/eisenhower-matrix";
 import { OccurrencePreview } from "@/components/tasks/occurrence-preview";
 import {
   RecurrenceFields,
@@ -29,6 +30,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ChevronDown } from "lucide-react";
+import type { Priority } from "@/db/schema";
 import { fa } from "@/lib/i18n/fa";
 import { useSubmitLock } from "@/lib/ui/submit-lock";
 import type { ActionResult } from "@/server/actions/auth";
@@ -51,7 +53,7 @@ type Props = {
     title: string;
     description: string | null;
     categoryId: number | null;
-    priority: "LOW" | "MEDIUM" | "HIGH";
+    priority: Priority;
     requiresNote: boolean;
     requiresAttachment: boolean;
     skipHolidays: boolean;
@@ -59,6 +61,7 @@ type Props = {
     startDate: string;
     endDate: string | null;
     dueTime: string | null;
+    startTime?: string | null;
     recurrenceType: RecurrenceState["recurrenceType"];
     recurrenceConfig: Record<string, unknown>;
     userIds: number[];
@@ -96,16 +99,49 @@ export function TaskForm({
   const [categoryId, setCategoryId] = useState(
     initial?.categoryId ? String(initial.categoryId) : "",
   );
-  const [priority, setPriority] = useState(initial?.priority ?? "MEDIUM");
+  const [priority, setPriority] = useState<Priority>(initial?.priority ?? "SCHEDULE");
   const [requiresNote, setRequiresNote] = useState(initial?.requiresNote ?? false);
   const [requiresAttachment, setRequiresAttachment] = useState(
     initial?.requiresAttachment ?? false,
   );
+  const [dueTime, setDueTime] = useState(initial?.dueTime ?? "");
+  const [startTime, setStartTime] = useState(initial?.startTime ?? "");
   const [recurrence, setRecurrence] = useState<RecurrenceState>({
     recurrenceType: initial?.recurrenceType ?? "DAILY",
     config: initial?.recurrenceConfig ?? { interval: 1, excludeWeekdays: [] },
   });
+  const [assignees, setAssignees] = useState({
+    key: 0,
+    userIds: initial?.userIds ?? [],
+    departmentIds: initial?.departmentIds ?? [],
+  });
+  const [showCopy, setShowCopy] = useState(Boolean(copyFromTitle));
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  const resetForAnother = useCallback(() => {
+    setTitle("");
+    setDescription("");
+    setStartDate("");
+    setEndDate(null);
+    setSkipHolidays(true);
+    setCompletionMode("INDIVIDUAL");
+    setCategoryId("");
+    setPriority("SCHEDULE");
+    setRequiresNote(false);
+    setRequiresAttachment(false);
+    setDueTime("");
+    setStartTime("");
+    setRecurrence({
+      recurrenceType: "DAILY",
+      config: { interval: 1, excludeWeekdays: [] },
+    });
+    setAssignees((prev) => ({
+      key: prev.key + 1,
+      userIds: [],
+      departmentIds: [],
+    }));
+    setShowCopy(false);
+  }, []);
 
   useEffect(() => {
     if (!state) return;
@@ -119,15 +155,22 @@ export function TaskForm({
         : undefined;
     if (mode === "create") {
       const taskId = "taskId" in state ? (state as { taskId?: number }).taskId : undefined;
+      const after =
+        "after" in state && (state as { after?: string }).after === "new" ? "new" : "edit";
       toast.success(fa.common.taskCreated);
       if (hint) toast.message(hint);
+      if (after === "new") {
+        resetForAnother();
+        router.replace("/admin/tasks/new");
+        return;
+      }
       if (taskId) router.replace(`/admin/tasks/${taskId}`);
       return;
     }
     if (hint) toast.message(hint);
     else toast.success(fa.common.success);
     router.refresh();
-  }, [state, router, mode]);
+  }, [state, router, mode, resetForAnother]);
 
   const preview = (
     <OccurrencePreview
@@ -151,7 +194,7 @@ export function TaskForm({
         <input type="hidden" name="id" value={initial.id} />
       ) : null}
 
-      {copyFromTitle ? (
+      {showCopy && copyFromTitle ? (
         <p className="bg-muted rounded-md px-3 py-2 text-sm">
           کپی از: <strong>{copyFromTitle}</strong>
         </p>
@@ -181,8 +224,7 @@ export function TaskForm({
               disabled={pending}
             />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
+          <div className="space-y-2 sm:max-w-xs">
               <Label>دسته</Label>
               <Select
                 value={categoryId || "__none__"}
@@ -203,28 +245,15 @@ export function TaskForm({
                 </SelectContent>
               </Select>
               <input type="hidden" name="categoryId" value={categoryId} />
-            </div>
-            <div className="space-y-2">
-              <Label>اولویت</Label>
-              <Select
-                value={priority}
-                onValueChange={(v) =>
-                  setPriority(v as "LOW" | "MEDIUM" | "HIGH")
-                }
-              >
-                <SelectTrigger aria-label="اولویت">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(fa.priority).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>
-                      {v}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <input type="hidden" name="priority" value={priority} />
-            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>{fa.auditFields.priority}</Label>
+            <EisenhowerMatrix
+              value={priority}
+              onChange={setPriority}
+              disabled={pending}
+            />
+            <input type="hidden" name="priority" value={priority} />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -243,16 +272,34 @@ export function TaskForm({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="dueTime">مهلت روزانه (HH:mm)</Label>
-            <Input
-              id="dueTime"
-              name="dueTime"
-              dir="ltr"
-              className="text-start"
-              placeholder="مثلاً 14:00"
-              defaultValue={initial?.dueTime ?? ""}
-            />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="startTime">{fa.tasks.startTime}</Label>
+              <Input
+                id="startTime"
+                name="startTime"
+                type="time"
+                dir="ltr"
+                className="text-start"
+                value={startTime}
+                onChange={(event) => setStartTime(event.target.value)}
+                disabled={pending}
+              />
+              <p className="text-muted-foreground text-xs leading-relaxed">{fa.tasks.startTimeHint}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dueTime">مهلت روزانه (HH:mm)</Label>
+              <Input
+                id="dueTime"
+                name="dueTime"
+                dir="ltr"
+                className="text-start"
+                placeholder="مثلاً 14:00"
+                value={dueTime}
+                onChange={(event) => setDueTime(event.target.value)}
+                disabled={pending}
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -333,8 +380,9 @@ export function TaskForm({
           <AssigneePicker
             staff={staff}
             departments={departments}
-            initialUserIds={initial?.userIds}
-            initialDepartmentIds={initial?.departmentIds}
+            key={assignees.key}
+            initialUserIds={assignees.userIds}
+            initialDepartmentIds={assignees.departmentIds}
             managerLockedDeptId={
               actorRole === "MANAGER" ? managerDepartmentId ?? null : null
             }
@@ -374,14 +422,40 @@ export function TaskForm({
       ) : null}
 
       <div className="bg-background/95 sticky-actions sticky z-10 flex flex-wrap gap-2 border-t py-3 backdrop-blur md:static md:bottom-auto md:border-0 md:bg-transparent md:py-0 md:backdrop-blur-none">
-        <Button
-          type="submit"
-          disabled={pending}
-          aria-busy={pending}
-          className="min-h-11 flex-1 md:flex-none"
-        >
-          {pending ? fa.common.loading : fa.common.save}
-        </Button>
+        {mode === "create" ? (
+          <>
+            <Button
+              type="submit"
+              name="after"
+              value="edit"
+              disabled={pending}
+              aria-busy={pending}
+              className="min-h-11 flex-1 md:flex-none"
+            >
+              {pending ? fa.common.loading : fa.common.register}
+            </Button>
+            <Button
+              type="submit"
+              name="after"
+              value="new"
+              variant="outline"
+              disabled={pending}
+              aria-busy={pending}
+              className="min-h-11 flex-1 md:flex-none"
+            >
+              {pending ? fa.common.loading : fa.common.registerAndNew}
+            </Button>
+          </>
+        ) : (
+          <Button
+            type="submit"
+            disabled={pending}
+            aria-busy={pending}
+            className="min-h-11 flex-1 md:flex-none"
+          >
+            {pending ? fa.common.loading : fa.common.save}
+          </Button>
+        )}
         <Button
           type="button"
           variant="outline"

@@ -9,7 +9,13 @@ import { loadMeReport } from "@/server/queries/me-report";
 import { loadMeToday } from "@/server/queries/me-today";
 import { lazyGenerateOnce } from "@/server/services/lazy-generate";
 
-export default async function MeTodayPage() {
+export default async function MeTodayPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ focus?: string }>;
+}) {
+  const params = await searchParams;
+  const focus = Number(params.focus);
   const user = await requireUserOrRedirect({
     roles: ["STAFF", "ADMIN", "MANAGER"],
   });
@@ -35,6 +41,7 @@ export default async function MeTodayPage() {
       todayList={data.todayList}
       weekList={data.weekList}
       monthList={data.monthList}
+      archiveList={data.archiveList}
       excusedList={data.excusedList}
       progress={data.progress}
       showLeaveBanner={data.showLeaveBanner}
@@ -42,6 +49,8 @@ export default async function MeTodayPage() {
       streakCurrent={report.streaks.current}
       streakBest={report.streaks.best}
       pinned={pinned}
+      focusId={Number.isInteger(focus) && focus > 0 ? focus : null}
+      nextRevealAt={data.nextRevealAt}
     />
   );
 }

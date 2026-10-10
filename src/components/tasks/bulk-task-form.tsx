@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { EisenhowerMatrix } from "@/components/tasks/eisenhower-matrix";
 import {
   RecurrenceFields,
   type RecurrenceState,
@@ -18,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { Priority } from "@/db/schema";
 import { fa } from "@/lib/i18n/fa";
 import { prepareBulkTitles } from "@/lib/tasks/bulk-titles";
 import { useSubmitLock } from "@/lib/ui/submit-lock";
@@ -58,7 +60,7 @@ export function BulkTaskForm({
   );
   const [assigneeId, setAssigneeId] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [priority, setPriority] = useState("MEDIUM");
+  const [priority, setPriority] = useState<Priority>("SCHEDULE");
   const [completionMode, setCompletionMode] = useState<"INDIVIDUAL" | "SHARED">(
     "INDIVIDUAL",
   );
@@ -231,21 +233,10 @@ export function BulkTaskForm({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label>اولویت</Label>
-          <Select value={priority} onValueChange={setPriority}>
-            <SelectTrigger aria-label="اولویت">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.keys(fa.priority) as Array<keyof typeof fa.priority>).map((key) => (
-                <SelectItem key={key} value={key}>
-                  {fa.priority[key]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>{fa.auditFields.priority}</Label>
+        <EisenhowerMatrix value={priority} onChange={setPriority} disabled={pending} />
       </div>
 
       <fieldset className="space-y-2">
@@ -271,6 +262,12 @@ export function BulkTaskForm({
           مشترک
         </label>
       </fieldset>
+
+      <div className="space-y-2">
+        <Label htmlFor="startTime">{fa.tasks.startTime}</Label>
+        <Input id="startTime" name="startTime" type="time" dir="ltr" className="text-start" disabled={pending} />
+        <p className="text-muted-foreground text-xs leading-relaxed">{fa.tasks.startTimeHint}</p>
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="dueTime">مهلت روزانه (HH:mm)</Label>

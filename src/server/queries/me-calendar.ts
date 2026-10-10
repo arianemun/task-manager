@@ -9,10 +9,12 @@ import {
   jalaliMonthLength,
   jalaliWeekday,
   startOfJalaliMonth,
+  todayTehran,
   toJalali,
   type GDate,
 } from "@/lib/dates";
 import { countableCompletion } from "@/lib/reports";
+import { isTaskVisibleAt } from "@/lib/tasks/start-time";
 import { leaveDatesForUser } from "@/server/queries/me-today";
 
 export type CalendarDayCell = {
@@ -49,6 +51,7 @@ export function loadMeCalendarMonth(userId: number, anchor: GDate) {
       periodStart: taskOccurrences.periodStart,
       periodEnd: taskOccurrences.periodEnd,
       title: taskTemplates.title,
+      startTime: taskTemplates.startTime,
       id: taskOccurrences.id,
       completedByUserId: taskOccurrences.completedByUserId,
     })
@@ -63,8 +66,7 @@ export function loadMeCalendarMonth(userId: number, anchor: GDate) {
     )
     .all();
 
-  const today = anchor; // caller passes today or selected month anchor for "future" — use real today from caller
-  void today;
+  const today = todayTehran();
 
   const cells: CalendarDayCell[] = [];
   // leading padding (شنبه اول)
@@ -89,7 +91,8 @@ export function loadMeCalendarMonth(userId: number, anchor: GDate) {
       (r) =>
         (r.periodKey.startsWith("D:") || r.periodKey.startsWith("O:")) &&
         compareGDate(r.periodStart, g) <= 0 &&
-        compareGDate(r.periodEnd, g) >= 0,
+        compareGDate(r.periodEnd, g) >= 0 &&
+        (compareGDate(g, today) !== 0 || isTaskVisibleAt(r.startTime)),
     );
     const own = daily.filter(
       (r) => r.completedByUserId == null || r.completedByUserId === userId,
@@ -136,6 +139,7 @@ export function dayDetail(userId: number, date: GDate) {
       periodKey: taskOccurrences.periodKey,
       note: taskOccurrences.note,
       priority: taskTemplates.priority,
+      startTime: taskTemplates.startTime,
       completedByUserId: taskOccurrences.completedByUserId,
     })
     .from(taskOccurrences)
@@ -147,7 +151,10 @@ export function dayDetail(userId: number, date: GDate) {
         sql`${taskOccurrences.periodEnd} >= ${date}`,
       ),
     )
-    .all();
+    .all()
+    .filter(
+      (row) => compareGDate(date, todayTehran()) !== 0 || isTaskVisibleAt(row.startTime),
+    );
 
   const completerIds = [
     ...new Set(

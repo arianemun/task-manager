@@ -29,7 +29,7 @@ export type Permission = (typeof PERMISSIONS)[number];
 export const ANNOUNCEMENT_AUDIENCES = ["ALL", "DEPARTMENT", "USERS"] as const;
 export type AnnouncementAudience = (typeof ANNOUNCEMENT_AUDIENCES)[number];
 
-export const PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
+export const PRIORITIES = ["DO", "SCHEDULE", "DELEGATE", "ELIMINATE"] as const;
 export type Priority = (typeof PRIORITIES)[number];
 
 export const RECURRENCE_TYPES = [
@@ -257,7 +257,7 @@ export const taskTemplates = sqliteTable(
     categoryId: integer("category_id").references(() => taskCategories.id, {
       onDelete: "set null",
     }),
-    priority: text("priority").$type<Priority>().notNull().default("MEDIUM"),
+    priority: text("priority").$type<Priority>().notNull().default("SCHEDULE"),
     requiresNote: integer("requires_note", { mode: "boolean" })
       .notNull()
       .default(false),
@@ -274,6 +274,8 @@ export const taskTemplates = sqliteTable(
       .default({}),
     startDate: text("start_date").notNull(), // Gregorian YYYY-MM-DD
     endDate: text("end_date"),
+    /** HH:mm تهران. خالی یعنی از ابتدای روز دیده شود. */
+    startTime: text("start_time"),
     dueTime: text("due_time"), // HH:mm
     skipHolidays: integer("skip_holidays", { mode: "boolean" })
       .notNull()
@@ -669,6 +671,8 @@ export const notifications = sqliteTable(
     entityType: text("entity_type"),
     entityId: integer("entity_id"),
     groupKey: text("group_key"),
+    /** کلید یکتای اعلان کار: نوع + کاربر + occurrence یا تاریخ. تهی برای چت. */
+    dedupeKey: text("dedupe_key"),
     /** تعداد پیام‌های جمع‌شده در یک اعلان چت */
     bundleCount: integer("bundle_count").notNull().default(1),
     priority: text("priority")
@@ -684,6 +688,9 @@ export const notifications = sqliteTable(
     index("notifications_user_created_idx").on(t.userId, t.createdAt),
     index("notifications_user_read_idx").on(t.userId, t.readAt),
     index("notifications_group_key_idx").on(t.groupKey),
+    uniqueIndex("notifications_user_dedupe_uidx")
+      .on(t.userId, t.dedupeKey)
+      .where(sql`${t.dedupeKey} is not null`),
   ],
 );
 
