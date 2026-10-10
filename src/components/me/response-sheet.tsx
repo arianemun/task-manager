@@ -19,6 +19,7 @@ import {
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
 import type { NotDoneReason } from "@/lib/settings/not-done-reasons";
+import { notDoneNoteRequired } from "@/lib/tasks/not-done-note";
 
 type Props = {
   open: boolean;
@@ -74,11 +75,15 @@ export function ResponseSheet({
   }, [file]);
 
   const title = intent === "done" ? "ثبت انجام" : "ثبت انجام‌نشدن";
-  const noteRequired = requiresNote || intent === "not_done";
+  const selectedReason = reasons.find((reason) => reason.code === reasonCode) ?? null;
+  const noteRequired =
+    intent === "not_done"
+      ? notDoneNoteRequired({ requiresNote, reason: selectedReason })
+      : requiresNote;
   const canSubmit = useMemo(() => {
     if (pending) return false;
-    if (noteRequired && !note.trim() && intent === "done") return false;
-    if (intent === "not_done" && !reasonCode && !note.trim()) return false;
+    if (intent === "not_done" && !reasonCode) return false;
+    if (noteRequired && !note.trim()) return false;
     if (requiresAttachment && !file) return false;
     return true;
   }, [pending, noteRequired, note, intent, reasonCode, requiresAttachment, file]);
@@ -104,14 +109,9 @@ export function ResponseSheet({
                   if (v) setReasonCode(v);
                 }}
                 variant="outline"
-                className="flex w-full flex-wrap justify-start gap-2"
               >
                 {reasons.map((r) => (
-                  <ToggleGroupItem
-                    key={r.code}
-                    value={r.code}
-                    className="min-h-11 rounded-full px-3 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                  >
+                  <ToggleGroupItem key={r.code} value={r.code}>
                     {r.label}
                   </ToggleGroupItem>
                 ))}
@@ -119,7 +119,7 @@ export function ResponseSheet({
             </div>
           ) : null}
 
-          {noteRequired || intent === "done" ? (
+          {intent === "done" || intent === "not_done" ? (
             <div className="space-y-2">
               <Label>
                 توضیح{noteRequired ? " (الزامی)" : " (اختیاری)"}
@@ -195,8 +195,8 @@ export function ResponseSheet({
             className="min-h-11"
             disabled={!canSubmit}
             onClick={() => {
-              if (intent === "done" && requiresNote && !note.trim()) return;
-              if (intent === "not_done" && !reasonCode && !note.trim()) return;
+              if (intent === "not_done" && !reasonCode) return;
+              if (noteRequired && !note.trim()) return;
               if (requiresAttachment && !file) return;
               onSubmit({
                 note: note.trim() || undefined,

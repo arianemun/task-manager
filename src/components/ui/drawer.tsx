@@ -5,10 +5,18 @@ import { cn } from "@/lib/utils"
 import { drawerPointerReachesVaul } from "@/components/ui/drawer-drag"
 import { Drawer as DrawerPrimitive } from "vaul"
 
-function Drawer({
-  ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root>) {
-  return <DrawerPrimitive.Root data-slot="drawer" {...props} />
+function Drawer(props: React.ComponentProps<typeof DrawerPrimitive.Root>) {
+  // vaul پیش‌فرض repositionInputs=true است و در dist/index.mjs حدود خط ۱۱۱۴
+  // هم bottom و هم height را با innerHeight − visualViewport.height عوض می‌کند.
+  // آن اختلاف offsetTop را هم داخل خودش دارد و روی iPhone کشو را دو بار بالا می‌برد.
+  // جبران کیبورد فقط از --keyboard-inset در KeyboardChrome است.
+  return (
+    <DrawerPrimitive.Root
+      data-slot="drawer"
+      {...props}
+      repositionInputs={false}
+    />
+  )
 }
 
 function DrawerTrigger({
@@ -56,7 +64,7 @@ function DrawerContent({
       <DrawerPrimitive.Content
         data-slot="drawer-content"
         className={cn(
-          "group/drawer-content fixed z-50 flex h-auto flex-col bg-background",
+          "group/drawer-content fixed z-50 flex h-auto flex-col overflow-hidden bg-background",
           "data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[92dvh] data-[vaul-drawer-direction=top]:rounded-b-lg data-[vaul-drawer-direction=top]:border-b",
           "data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[92dvh] data-[vaul-drawer-direction=bottom]:rounded-t-lg data-[vaul-drawer-direction=bottom]:border-t",
           "data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:end-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:border-s data-[vaul-drawer-direction=right]:sm:max-w-sm",
@@ -66,7 +74,7 @@ function DrawerContent({
         {...props}
       >
         <div
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
           onPointerDown={(event) => {
             if (drawerPointerReachesVaul(event.target)) return
             event.stopPropagation()
@@ -88,7 +96,7 @@ function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="drawer-header"
       className={cn(
-        "flex flex-col gap-0.5 p-4 group-data-[vaul-drawer-direction=bottom]/drawer-content:text-center group-data-[vaul-drawer-direction=top]/drawer-content:text-center md:gap-1.5 md:text-start",
+        "flex shrink-0 flex-col gap-0.5 p-4 group-data-[vaul-drawer-direction=bottom]/drawer-content:text-center group-data-[vaul-drawer-direction=top]/drawer-content:text-center md:gap-1.5 md:text-start",
         className
       )}
       {...props}
@@ -101,7 +109,7 @@ function DrawerFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="drawer-footer"
-      className={cn("mt-auto flex flex-col gap-2 p-4", className)}
+      className={cn("mt-auto flex shrink-0 flex-col gap-2 p-4", className)}
       {...props}
     />
   )

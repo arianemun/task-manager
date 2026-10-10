@@ -87,15 +87,19 @@ function StatusEditForm({
   status,
   pending,
   formAction,
+  formId,
+  showSubmit = true,
 }: {
   occurrenceId: number;
   status: OccurrenceStatus;
   pending: boolean;
   formAction: (payload: FormData) => void;
+  formId?: string;
+  showSubmit?: boolean;
 }) {
   const [next, setNext] = useState(status);
   return (
-    <form action={formAction} className="space-y-3">
+    <form id={formId} action={formAction} className="space-y-3">
       <input type="hidden" name="occurrenceId" value={occurrenceId} />
       <div className="space-y-2">
         <Label>وضعیت جدید</Label>
@@ -122,9 +126,11 @@ function StatusEditForm({
           rows={3}
         />
       </div>
-      <Button type="submit" disabled={pending} className="w-full">
-        ذخیره
-      </Button>
+      {showSubmit ? (
+        <Button type="submit" disabled={pending} className="w-full">
+          ذخیره
+        </Button>
+      ) : null}
     </form>
   );
 }
@@ -262,9 +268,20 @@ export function StatusCell({
             status={status}
             pending={pending}
             formAction={formAction}
+            formId={`status-${occurrenceId}`}
+            showSubmit={false}
           />
         </ResponsiveDialogBody>
-        <ResponsiveDialogFooter />
+        <ResponsiveDialogFooter>
+          <Button
+            type="submit"
+            form={`status-${occurrenceId}`}
+            disabled={pending}
+            className="w-full"
+          >
+            ذخیره
+          </Button>
+        </ResponsiveDialogFooter>
       </ResponsiveDialogContent>
     </ResponsiveDialog>
   );

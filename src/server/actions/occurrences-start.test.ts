@@ -111,4 +111,90 @@ describe("ثبت پاسخ قبل از ساعت شروع", () => {
     const saved = await submitOccurrenceAction(done);
     expect(saved.ok).toBe(true);
   });
+
+  it("توضیح انجام‌نشدن فقط برای سایر یا کارِ نیازمند توضیح الزامی است", async () => {
+    vi.setSystemTime(AT);
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const dept = db.insert(schema.departments).values({ name: "کافه" }).returning().get();
+    const staff = db
+      .insert(schema.users)
+      .values({
+        username: "ali",
+        passwordHash: "x",
+        role: "STAFF",
+        fullName: "علی",
+        fullNameNormalized: "علی",
+        isActive: true,
+      })
+      .returning()
+      .get();
+    requireUser.mockResolvedValue({
+      id: staff.id,
+      role: "STAFF",
+      departmentIds: [dept.id],
+    });
+    const template = db
+      .insert(schema.taskTemplates)
+      .values({
+        title: "نظافت",
+        recurrenceType: "DAILY",
+        recurrenceConfig: {},
+        startDate: DAY,
+        startTime: "09:00",
+        createdBy: staff.id,
+      })
+      .returning()
+      .get();
+    const open = db
+      .insert(schema.taskOccurrences)
+      .values({
+        templateId: template.id,
+        userId: staff.id,
+        sourceDepartmentId: dept.id,
+        periodKey: `D:${DAY}`,
+        periodStart: DAY,
+        periodEnd: DAY,
+        status: "PENDING",
+      })
+      .returning()
+      .get();
+    const { submitOccurrenceAction } = await import("./occurrences");
+
+    const ready = new FormData();
+    ready.set("occurrenceId", String(open.id));
+    ready.set("intent", "not_done");
+    ready.set("reasonCode", "no_time");
+    const withoutNote = await submitOccurrenceAction(ready);
+    expect(withoutNote.ok).toBe(true);
+
+    db.update(schema.taskOccurrences)
+      .set({ status: "PENDING", note: null, reasonCode: null, completedAt: null })
+      .where(eq(schema.taskOccurrences.id, open.id))
+      .run();
+    const other = new FormData();
+    other.set("occurrenceId", String(open.id));
+    other.set("intent", "not_done");
+    other.set("reasonCode", "other");
+    const missing = await submitOccurrenceAction(other);
+    expect(missing.ok).toBe(false);
+    other.set("note", "جزئیات");
+    const withNote = await submitOccurrenceAction(other);
+    expect(withNote.ok).toBe(true);
+
+    db.update(schema.taskOccurrences)
+      .set({ status: "PENDING", note: null, reasonCode: null, completedAt: null })
+      .where(eq(schema.taskOccurrences.id, open.id))
+      .run();
+    db.update(schema.taskTemplates)
+      .set({ requiresNote: true })
+      .where(eq(schema.taskTemplates.id, template.id))
+      .run();
+    const forced = new FormData();
+    forced.set("occurrenceId", String(open.id));
+    forced.set("intent", "not_done");
+    forced.set("reasonCode", "no_time");
+    const stillRequired = await submitOccurrenceAction(forced);
+    expect(stillRequired.ok).toBe(false);
+  });
 });

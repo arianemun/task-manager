@@ -35,7 +35,15 @@ const schema = z
 type Values = z.infer<typeof schema>;
 const initial: ActionResult | null = null;
 
-export function ChangePasswordForm() {
+export function ChangePasswordForm({
+  id,
+  hideSubmit = false,
+  onPendingChange,
+}: {
+  id?: string;
+  hideSubmit?: boolean;
+  onPendingChange?: (pending: boolean) => void;
+} = {}) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(
     changePasswordAction,
@@ -58,9 +66,14 @@ export function ChangePasswordForm() {
     }
   }, [state, router]);
 
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [onPendingChange, pending]);
+
   return (
     <Form {...form}>
       <form
+        id={id}
         className="space-y-4"
         onSubmit={form.handleSubmit((values) => {
           const fd = new FormData();
@@ -137,9 +150,11 @@ export function ChangePasswordForm() {
           </p>
         ) : null}
 
-        <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? fa.common.loading : fa.auth.changePassword}
-        </Button>
+        {hideSubmit ? null : (
+          <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? fa.common.loading : fa.auth.changePassword}
+          </Button>
+        )}
       </form>
     </Form>
   );

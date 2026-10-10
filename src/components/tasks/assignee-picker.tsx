@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { choiceChipClass } from "@/components/ui/choice-chip";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -182,13 +183,7 @@ export function AssigneePicker({
                 type="button"
                 disabled={managerLockedDeptId != null && !locked}
                 onClick={() => toggleDept(d.id)}
-                className={cn(
-                  "rounded-md border px-3 py-1.5 text-sm transition-colors",
-                  on
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-background hover:bg-accent",
-                  "disabled:opacity-50",
-                )}
+                className={choiceChipClass(on)}
               >
                 {d.name}
                 {locked ? " (دپارتمان شما)" : ""}

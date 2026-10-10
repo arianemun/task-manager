@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { choiceChipClass } from "@/components/ui/choice-chip";
 
 export function DepartmentChips({
   departments,
@@ -27,6 +27,7 @@ export function DepartmentChips({
               key={department.id}
               type="button"
               disabled={disabled}
+              aria-pressed={on}
               onClick={() =>
                 onChange(
                   on
@@ -34,13 +35,7 @@ export function DepartmentChips({
                     : [...selected, department.id],
                 )
               }
-              className={cn(
-                "rounded-md border px-3 py-1.5 text-sm transition-colors",
-                on
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-background hover:bg-accent",
-                "disabled:opacity-50",
-              )}
+              className={choiceChipClass(on)}
             >
               {department.name}
             </button>

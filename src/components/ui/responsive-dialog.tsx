@@ -48,7 +48,6 @@ function ResponsiveDialog({
       open={open}
       onOpenChange={onOpenChange}
       shouldScaleBackground={false}
-      repositionInputs
     >
       {children}
     </Drawer>

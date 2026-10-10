@@ -15,6 +15,7 @@ import {
 import {
   Drawer,
   DrawerContent,
+  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
@@ -109,7 +110,7 @@ export function NewChatButton(props: {
           </div>
           {error ? <p className="text-destructive px-4 pb-2 text-sm">{error}</p> : null}
           {mode === "department" ? (
-            <ul className="max-h-80 overflow-y-auto px-2 pb-4">
+            <ul className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
               {props.departments.map((dept) => (
                 <li key={dept.id}>
                   <button
@@ -140,7 +141,7 @@ export function NewChatButton(props: {
               ))}
             </ul>
           ) : (
-            <div className="px-4 pb-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
               {mode === "group" ? (
                 <input
                   value={title}
@@ -198,38 +199,40 @@ export function NewChatButton(props: {
                   </CommandGroup>
                 </CommandList>
               </Command>
-              {mode === "group" ? (
-                <Button
-                  type="button"
-                  className="mt-3 w-full"
-                  disabled={pending}
-                  aria-busy={pending}
-                  onClick={() => {
-                    if (!claimClick()) return;
-                    startTransition(async () => {
-                      try {
-                        const result = await createGroupChatAction({
-                          title,
-                          memberIds: picked,
-                        });
-                        if (!result.ok) {
-                          setError(result.error);
-                          releaseClick();
-                          return;
-                        }
-                        go(result.id);
-                      } catch {
-                        setError(fa.common.saveFailed);
-                        releaseClick();
-                      }
-                    });
-                  }}
-                >
-                  {pending ? fa.common.loading : fa.common.create}
-                </Button>
-              ) : null}
             </div>
           )}
+          {mode === "group" ? (
+            <DrawerFooter>
+              <Button
+                type="button"
+                className="w-full"
+                disabled={pending}
+                aria-busy={pending}
+                onClick={() => {
+                  if (!claimClick()) return;
+                  startTransition(async () => {
+                    try {
+                      const result = await createGroupChatAction({
+                        title,
+                        memberIds: picked,
+                      });
+                      if (!result.ok) {
+                        setError(result.error);
+                        releaseClick();
+                        return;
+                      }
+                      go(result.id);
+                    } catch {
+                      setError(fa.common.saveFailed);
+                      releaseClick();
+                    }
+                  });
+                }}
+              >
+                {pending ? fa.common.loading : fa.common.create}
+              </Button>
+            </DrawerFooter>
+          ) : null}
         </DrawerContent>
       </Drawer>
     </>

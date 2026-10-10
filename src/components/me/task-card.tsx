@@ -280,7 +280,7 @@ export function TaskCard({ occ, reasons, highlighted = false }: Props) {
         open={sheet != null}
         intent={sheet ?? "done"}
         reasons={reasons}
-        requiresNote={occ.requiresNote || sheet === "not_done"}
+        requiresNote={occ.requiresNote}
         requiresAttachment={occ.requiresAttachment}
         initialNote={local.note ?? ""}
         initialReason={local.reasonCode ?? ""}

@@ -64,6 +64,7 @@
   --bottom-nav-h: 3.5rem;
   --bottom-chrome: 0px;
   --keyboard-inset: 0px;
+  --visual-viewport-height: 100dvh;
   --chat-bg: oklch(0.93 0.008 286);
 
   /* تایپوگرافی — حداکثر ۵ اندازه، ۳ وزن */
@@ -378,6 +379,11 @@
 
 html[data-keyboard="open"] {
   --safe-bottom: 0px;
+}
+
+html[data-keyboard="open"] [data-slot="drawer-content"][data-vaul-drawer-direction="bottom"] {
+  bottom: var(--keyboard-inset);
+  max-height: calc(var(--visual-viewport-height) - 12px);
 }
 
 html[data-keyboard="open"] [data-has-bottom-nav] {

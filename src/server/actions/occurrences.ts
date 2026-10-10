@@ -10,6 +10,7 @@ import { requireUser } from "@/lib/auth/user";
 import { compareGDate, todayTehran } from "@/lib/dates";
 import { statusFromCompletion } from "@/lib/recurrence";
 import { isStaffResponseLocked } from "@/lib/tasks/response-lock";
+import { notDoneNoteRequired } from "@/lib/tasks/not-done-note";
 import { responseBlockedBeforeStart } from "@/lib/tasks/start-time";
 import { saveOccurrenceAttachment } from "@/lib/uploads/attachment";
 import { getNotDoneReasonsForDepartments } from "@/lib/settings/not-done-reasons";
@@ -114,22 +115,26 @@ export async function submitOccurrenceAction(
     const reasonCode = String(formData.get("reasonCode") || "").trim() || null;
     const file = formData.get("attachment");
 
+    const departmentReasons =
+      intent === "not_done" ? getNotDoneReasonsForDepartments(actor.departmentIds) : [];
     if (intent === "not_done") {
-      if (!reasonCode && !note) {
+      if (!reasonCode) {
         return { ok: false, error: "دلیل انجام‌نشدن الزامی است" };
       }
-      if (reasonCode && reasonCode !== occ.reasonCode) {
-        const allowed = new Set(
-          getNotDoneReasonsForDepartments(actor.departmentIds).map(
-            (reason) => reason.code,
-          ),
-        );
-        if (!allowed.has(reasonCode)) {
-          return { ok: false, error: "این دلیل برای دپارتمان شما مجاز نیست" };
-        }
+      const selected = departmentReasons.find((reason) => reason.code === reasonCode);
+      if (reasonCode !== occ.reasonCode && !selected) {
+        return { ok: false, error: "این دلیل برای دپارتمان شما مجاز نیست" };
       }
-    }
-    if (template.requiresNote && !note) {
+      if (
+        notDoneNoteRequired({
+          requiresNote: template.requiresNote,
+          reason: selected ?? { code: reasonCode, label: "" },
+        }) &&
+        !note
+      ) {
+        return { ok: false, error: "توضیح برای این کار الزامی است" };
+      }
+    } else if (template.requiresNote && !note) {
       return { ok: false, error: "توضیح برای این کار الزامی است" };
     }
 
