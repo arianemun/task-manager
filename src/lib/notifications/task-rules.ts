@@ -30,8 +30,12 @@ const TASK_TYPES: NotificationType[] = [
   "task.daily_digest",
   "task.due_soon",
   "task.overdue",
+  "task.visible",
   "task.manager_summary",
 ];
+
+/** بعد از ساعت شروع، فقط در این پنجره اعلان «قابل انجام شد» می‌رود. */
+export const VISIBLE_CATCHUP_MS = 30 * 60 * 1000;
 
 export function notificationTypesForRole(role: Role): NotificationType[] {
   return NOTIFICATION_TYPES.filter((type) => {
@@ -60,7 +64,30 @@ export function assignedCopy(input: {
   };
 }
 
-export function digestCopy(todayCount: number, openCount: number): { title: string; body: string } {
+export type LaterTaskBucket = { clock: string; count: number };
+
+function laterPhrase(later: LaterTaskBucket[]): string {
+  return later
+    .filter((bucket) => bucket.count > 0)
+    .map((bucket) => {
+      const hour = String(Number(bucket.clock.slice(0, 2)));
+      return `${toFaDigits(bucket.count)} کار از ساعت ${toFaDigits(hour)}`;
+    })
+    .join("، ");
+}
+
+export function digestCopy(
+  todayCount: number,
+  openCount: number,
+  later: LaterTaskBucket[] = [],
+): { title: string; body: string } {
+  const laterText = laterPhrase(later);
+  if (laterText) {
+    return {
+      title: `${toFaDigits(todayCount + openCount)} کار الان، ${laterText}`,
+      body: "",
+    };
+  }
   if (todayCount > 0) {
     return {
       title: `امروز ${toFaDigits(todayCount)} کار دارید`,
@@ -70,6 +97,16 @@ export function digestCopy(todayCount: number, openCount: number): { title: stri
   return {
     title: `${toFaDigits(openCount)} کار هفتگی یا ماهانه باز است`,
     body: "",
+  };
+}
+
+export function visibleCopy(titles: string[]): { title: string; body: string } {
+  if (titles.length <= 1) {
+    return { title: titles[0] ?? "کار", body: "از الان قابل انجام است" };
+  }
+  return {
+    title: `${toFaDigits(titles.length)} کار از الان قابل انجام است`,
+    body: titles.slice(0, 3).join("، "),
   };
 }
 
@@ -160,12 +197,13 @@ export function digestDecision(input: {
   onLeave: boolean;
   todayCount: number;
   openCount: number;
+  laterCount?: number;
   timing: "wait" | "late" | "due";
 }): DueDecision {
   if (input.timing === "wait") return { send: false, reason: "هنوز ساعت خلاصهٔ صبح نرسیده" };
   if (input.timing === "late") return { send: false, reason: "خلاصهٔ صبح بیش از دو ساعت دیر شده" };
   if (input.onLeave) return { send: false, reason: "امروز مرخصی است" };
-  if (input.todayCount + input.openCount <= 0) {
+  if (input.todayCount + input.openCount + (input.laterCount ?? 0) <= 0) {
     return { send: false, reason: "کار بازی برای امروز نمانده" };
   }
   return { send: true };

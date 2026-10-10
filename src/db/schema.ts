@@ -646,6 +646,7 @@ export const NOTIFICATION_TYPES = [
   "task.daily_digest",
   "task.due_soon",
   "task.overdue",
+  "task.visible",
   "task.manager_summary",
   "system.data_check_failed",
 ] as const;

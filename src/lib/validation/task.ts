@@ -114,6 +114,15 @@ export const taskFormSchema = z
         path: ["userIds"],
       });
     }
+    const start = typeof data.startTime === "string" && data.startTime.length === 5 ? data.startTime : "";
+    const due = typeof data.dueTime === "string" && data.dueTime.length === 5 ? data.dueTime : "";
+    if (start && due && start >= due) {
+      ctx.addIssue({
+        code: "custom",
+        message: "ساعت شروع باید قبل از ساعت مهلت باشد",
+        path: ["startTime"],
+      });
+    }
   });
 
 export type TaskFormInput = z.infer<typeof taskFormSchema>;

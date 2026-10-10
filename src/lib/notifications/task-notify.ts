@@ -3,6 +3,7 @@ import { db } from "@/db";
 import {
   holidays,
   notificationDeliveries,
+  notificationPreferences,
   notifications,
   staffLeaves,
   taskAssignments,
@@ -17,12 +18,13 @@ import { classifyOccurrence } from "@/lib/reports/classify";
 import { ratesFromCounts, type StatusCounts } from "@/lib/reports/rates";
 import {
   compareGDate,
+  dueAtTehranMs,
   tehranDateFromMs,
   type GDate,
 } from "@/lib/dates";
 import { enqueuePush } from "@/lib/push/queue";
 import { requestSocketNotify } from "@/lib/realtime/notify";
-import { isTaskVisibleAt } from "@/lib/tasks/start-time";
+import { isTaskVisibleAt, normalizeStartTime } from "@/lib/tasks/start-time";
 import { safeInternalPath } from "./store";
 import { loadTaskNotifySettings } from "./task-settings";
 import {
@@ -40,6 +42,9 @@ import {
   overdueDecision,
   quietPushMode,
   summaryCopy,
+  VISIBLE_CATCHUP_MS,
+  visibleCopy,
+  type LaterTaskBucket,
 } from "./task-rules";
 
 type Row = {
@@ -55,6 +60,7 @@ type Row = {
   templateId: number;
   title: string;
   dueTime: string | null;
+  startTime: string | null;
   completionMode: string;
   startDate: GDate;
 };
@@ -252,7 +258,6 @@ function loadRows(today: GDate, now = Date.now()): Row[] {
       ),
     )
     .all()
-    .filter((row) => isTaskVisibleAt(row.startTime, now))
     .map((row) => ({
       occurrenceId: row.occurrenceId,
       userId: row.userId,
@@ -266,6 +271,7 @@ function loadRows(today: GDate, now = Date.now()): Row[] {
       templateId: row.templateId,
       title: row.title,
       dueTime: row.dueTime,
+      startTime: row.startTime,
       completionMode: row.completionMode,
       startDate: row.startDate as GDate,
     }));
@@ -298,19 +304,44 @@ function sharedBlocked(row: Row, rows: Row[]): boolean {
   );
 }
 
-function countsFor(rows: Row[], onLeave: boolean, holiday: boolean) {
+function countsFor(rows: Row[], onLeave: boolean, holiday: boolean, now: number) {
   let todayCount = 0;
   let openCount = 0;
+  const later = new Map<string, number>();
   for (const row of rows) {
     if (row.status !== "PENDING") continue;
-    if (isDailyPeriod(row.periodKey)) {
-      if (onLeave || holiday) continue;
-      todayCount += 1;
-    } else if (isOpenPeriod(row.periodKey) && !onLeave) {
-      openCount += 1;
+    const daily = isDailyPeriod(row.periodKey);
+    const open = isOpenPeriod(row.periodKey);
+    if (daily && (onLeave || holiday)) continue;
+    if (open && onLeave) continue;
+    if (!daily && !open) continue;
+    if (isTaskVisibleAt(row.startTime, now)) {
+      if (daily) todayCount += 1;
+      else openCount += 1;
+    } else {
+      const clock = normalizeStartTime(row.startTime);
+      if (!clock) continue;
+      later.set(clock, (later.get(clock) ?? 0) + 1);
     }
   }
-  return { todayCount, openCount };
+  const laterBuckets: LaterTaskBucket[] = [...later.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([clock, count]) => ({ clock, count }));
+  return { todayCount, openCount, later: laterBuckets };
+}
+
+function visibleOptIn(userId: number): boolean {
+  const row = db
+    .select({ push: notificationPreferences.push })
+    .from(notificationPreferences)
+    .where(
+      and(
+        eq(notificationPreferences.userId, userId),
+        eq(notificationPreferences.type, "task.visible"),
+      ),
+    )
+    .get();
+  return row?.push === true;
 }
 
 function plansForUser(input: {
@@ -328,14 +359,16 @@ function plansForUser(input: {
   const plans: TaskNoticePlan[] = [];
   if (input.types.includes("task.daily_digest")) {
     const timing = clockReached(input.now, input.today, input.settings.digestTime, DIGEST_LATE_MS);
-    const counts = countsFor(mine, input.onLeave, input.holiday);
+    const counts = countsFor(mine, input.onLeave, input.holiday, input.now);
+    const laterCount = counts.later.reduce((sum, bucket) => sum + bucket.count, 0);
     const decision = digestDecision({
       onLeave: input.onLeave,
       todayCount: counts.todayCount,
       openCount: counts.openCount,
+      laterCount,
       timing,
     });
-    const copy = digestCopy(counts.todayCount, counts.openCount);
+    const copy = digestCopy(counts.todayCount, counts.openCount, counts.later);
     plans.push({
       willSend: decision.send,
       reason: decision.send ? "ارسال می‌شود" : decision.reason,
@@ -352,6 +385,7 @@ function plansForUser(input: {
   for (const type of ["task.due_soon", "task.overdue"] as const) {
     if (!input.types.includes(type)) continue;
     const matches = mine.filter((row) => {
+      if (!isTaskVisibleAt(row.startTime, input.now)) return false;
       const blocked = sharedBlocked(row, input.allRows);
       const decision =
         type === "task.due_soon"
@@ -427,6 +461,61 @@ function plansForUser(input: {
       });
     }
   }
+  if (input.types.includes("task.visible")) {
+    const base = {
+      userId: input.userId,
+      type: "task.visible" as const,
+      url: "/me" as string | null,
+      groupKey: `visible:${input.today}`,
+      entityId: null as number | null,
+    };
+    if (!visibleOptIn(input.userId)) {
+      plans.push({
+        ...base,
+        willSend: false,
+        reason: "این اعلان پیش‌فرض خاموش است",
+        title: "",
+        body: "",
+        dedupeKey: null,
+      });
+    } else {
+      const groups = new Map<string, Row[]>();
+      for (const row of mine) {
+        if (row.status !== "PENDING") continue;
+        const clock = normalizeStartTime(row.startTime);
+        if (!clock) continue;
+        const startAt = dueAtTehranMs(input.today, clock);
+        if (input.now < startAt || input.now - startAt > VISIBLE_CATCHUP_MS) continue;
+        const list = groups.get(clock) ?? [];
+        list.push(row);
+        groups.set(clock, list);
+      }
+      if (groups.size === 0) {
+        plans.push({
+          ...base,
+          willSend: false,
+          reason: "کاری در نیم‌ساعت شروع نیست",
+          title: "",
+          body: "",
+          dedupeKey: null,
+        });
+      }
+      for (const [clock, list] of groups) {
+        const copy = visibleCopy(list.map((row) => row.title));
+        const one = list.length === 1 ? list[0] : null;
+        plans.push({
+          ...base,
+          willSend: true,
+          reason: "ارسال می‌شود",
+          title: copy.title,
+          body: copy.body,
+          url: one ? `/me?focus=${one.occurrenceId}` : "/me",
+          dedupeKey: `task.visible:${input.userId}:${input.today}:${clock}`,
+          entityId: one ? one.occurrenceId : null,
+        });
+      }
+    }
+  }
   return plans;
 }
 
@@ -476,6 +565,7 @@ function summaryPlan(input: {
         periodKey: row.periodKey,
         userId: row.userId,
         completedByUserId: null,
+        startTime: row.startTime,
       },
       { nowMs: input.now, from: input.today, to: input.today, today: input.today },
     );
@@ -486,14 +576,16 @@ function summaryPlan(input: {
   const byUser = new Map<number, { name: string; responded: boolean; pending: number }>();
   for (const row of active) {
     const current = byUser.get(row.userId) ?? { name: row.fullName, responded: false, pending: 0 };
-    if (row.status === "PENDING") current.pending += 1;
-    else current.responded = true;
+    if (row.status === "PENDING" && isTaskVisibleAt(row.startTime, input.now)) current.pending += 1;
+    else if (row.status !== "PENDING") current.responded = true;
     byUser.set(row.userId, current);
   }
   const silent = [...byUser.values()].filter((person) => !person.responded && person.pending > 0);
   const copy = summaryCopy({
     rate: rates.completionRate,
-    unanswered: active.filter((row) => row.status === "PENDING").length,
+    unanswered: active.filter(
+      (row) => row.status === "PENDING" && isTaskVisibleAt(row.startTime, input.now),
+    ).length,
     names: silent.map((person) => person.name),
   });
   return { ...base, willSend: true, reason: "ارسال می‌شود", title: copy.title, body: copy.body };
@@ -751,7 +843,7 @@ export function runTaskNotificationJob(now = Date.now()): number {
       onLeave: leaves.has(userId),
       holiday,
       settings,
-      types: ["task.daily_digest", "task.due_soon", "task.overdue"],
+      types: ["task.daily_digest", "task.due_soon", "task.overdue", "task.visible"],
     });
     sent += commitTaskNotices(plans, now);
   }

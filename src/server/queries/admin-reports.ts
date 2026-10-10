@@ -11,6 +11,7 @@ import { reasonLabelMap } from "@/lib/settings/not-done-reasons";
 import { departmentNamesForUser } from "@/lib/departments/membership";
 import { occurrenceSourceScope } from "@/lib/scope/occurrences";
 import { rateStatusSql } from "@/lib/reports/rate-sql";
+import { isOccurrenceNotStarted } from "@/lib/tasks/start-time";
 import { openPeriodCounts } from "@/server/queries/report-core";
 import {
   addGregorianDays,
@@ -591,6 +592,7 @@ export function listOccurrenceDetails(
       userId: users.id,
       title: taskTemplates.title,
       priority: taskTemplates.priority,
+      startTime: taskTemplates.startTime,
       recurrenceType: taskTemplates.recurrenceType,
     })
     .from(taskOccurrences)
@@ -625,6 +627,12 @@ export function listOccurrenceDetails(
   return {
     rows: rows.map((row) => ({
       ...row,
+      notStarted: isOccurrenceNotStarted({
+        status: row.status,
+        startTime: row.startTime,
+        periodStart: row.periodStart,
+        periodEnd: row.periodEnd,
+      }),
       completedByName: row.completedByUserId
         ? (completerNames.get(row.completedByUserId) ?? null)
         : null,

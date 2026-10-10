@@ -34,6 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { OccurrenceStatus } from "@/db/schema";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { fa } from "@/lib/i18n/fa";
+import { occurrenceStatusLabel } from "@/lib/reports/status-label";
 import { cn, toFaDigits } from "@/lib/utils";
 import type { ActionResult } from "@/server/actions/auth";
 import { updateOccurrenceStatusAction } from "@/server/actions/board";
@@ -47,15 +48,18 @@ type Props = {
   taskTitle?: string;
   staffName?: string;
   closedByName?: string | null;
+  notStarted?: boolean;
 };
 
 const initial: ActionResult | null = null;
 
 function StatusChip({
   status,
+  label,
   className,
 }: {
   status: OccurrenceStatus;
+  label?: string;
   className?: string;
 }) {
   const color = STATUS_COLORS[status];
@@ -73,7 +77,7 @@ function StatusChip({
         aria-hidden
       />
       <Icon className="size-3.5 shrink-0" aria-hidden />
-      <span className="sr-only md:not-sr-only md:inline">{color.label}</span>
+      <span className="sr-only md:not-sr-only md:inline">{label ?? color.label}</span>
     </span>
   );
 }
@@ -134,6 +138,7 @@ export function StatusCell({
   taskTitle,
   staffName,
   closedByName,
+  notStarted = false,
 }: Props) {
   const isDesktop = useIsDesktop();
   const [open, setOpen] = useState(false);
@@ -150,8 +155,9 @@ export function StatusCell({
     } else toast.error(state.error);
   }, [state]);
 
+  const label = occurrenceStatusLabel(status, notStarted);
   const tip = [
-    fa.status[status],
+    label,
     closedByName ? `ثبت توسط ${closedByName}` : null,
     completedAt
       ? `ثبت: ${toFaDigits(new Date(completedAt).toLocaleString("fa-IR"))}`
@@ -164,14 +170,14 @@ export function StatusCell({
   const aria = [
     staffName,
     taskTitle,
-    fa.status[status],
+    label,
   ]
     .filter(Boolean)
     .join("، ");
 
   const details = (
     <div className="space-y-2 text-sm">
-      <p className="font-medium">{fa.status[status]}</p>
+      <p className="font-medium">{label}</p>
       {completedAt ? (
         <p className="text-muted-foreground text-xs">
           ثبت: {toFaDigits(new Date(completedAt).toLocaleString("fa-IR"))}
@@ -190,7 +196,7 @@ export function StatusCell({
 
   const chip = (
     <span className="inline-flex flex-col items-center gap-0.5">
-      <StatusChip status={status} />
+      <StatusChip status={status} label={label} />
       {closedByName ? (
         <span className="text-muted-foreground max-w-24 truncate text-[10px] leading-tight">
           {closedByName}

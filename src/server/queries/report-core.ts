@@ -46,6 +46,7 @@ export function openPeriodCounts(
       periodKey: taskOccurrences.periodKey,
       userId: taskOccurrences.userId,
       completedByUserId: taskOccurrences.completedByUserId,
+      startTime: taskTemplates.startTime,
     })
     .from(taskOccurrences)
     .innerJoin(taskTemplates, eq(taskOccurrences.templateId, taskTemplates.id))
@@ -72,6 +73,7 @@ export function openPeriodCounts(
         periodKey: row.periodKey,
         userId: row.userId,
         completedByUserId: row.completedByUserId,
+        startTime: row.startTime,
       },
       { nowMs, from, to, today },
     );

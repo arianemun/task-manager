@@ -19,6 +19,7 @@ export const PUSH_ON_BY_DEFAULT: Record<NotificationType, boolean> = {
   "task.daily_digest": true,
   "task.due_soon": true,
   "task.overdue": true,
+  "task.visible": false,
   "task.manager_summary": true,
   "system.data_check_failed": true,
 };

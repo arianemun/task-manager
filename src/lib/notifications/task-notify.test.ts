@@ -70,7 +70,12 @@ describe("اعلان کارها", () => {
         { userId: manager.id, departmentId: kitchen.id, joinedAt: DAY },
       ])
       .run();
-    function template(title: string, dueTime: string | null, mode: "INDIVIDUAL" | "SHARED" = "INDIVIDUAL") {
+    function template(
+      title: string,
+      dueTime: string | null,
+      mode: "INDIVIDUAL" | "SHARED" = "INDIVIDUAL",
+      startTime: string | null = null,
+    ) {
       return db
         .insert(schema.taskTemplates)
         .values({
@@ -79,6 +84,7 @@ describe("اعلان کارها", () => {
           recurrenceConfig: { interval: 1, excludeWeekdays: [] },
           startDate: DAY,
           dueTime,
+          startTime,
           completionMode: mode,
           createdBy: staff.id,
         })
@@ -347,5 +353,80 @@ describe("اعلان کارها", () => {
         .run(staff.id, rows[0]?.dedupeKey),
     ).toThrow();
     raw.close();
+  });
+
+  it("خلاصهٔ صبح کار ساعت‌دار را جدا می‌شمارد و مهلت قبل از شروع نمی‌رود", async () => {
+    const { db, schema, cafe, staff, template, occurrence } = await seed();
+    const nowTask = template("الان", null);
+    const later = template("عصر", "18:00", "INDIVIDUAL", "14:00");
+    occurrence({ templateId: nowTask.id, userId: staff.id, departmentId: cafe.id });
+    occurrence({
+      templateId: later.id,
+      userId: staff.id,
+      departmentId: cafe.id,
+      dueAt: dueAtTehranMs(DAY, "18:00"),
+    });
+    const { previewTaskNotices, runTaskNotificationJob } = await import("./task-notify");
+    const digest = previewTaskNotices({ type: "task.daily_digest", userId: staff.id, now: AT_9 })[0];
+    expect(digest?.willSend).toBe(true);
+    expect(digest?.title).toBe("۱ کار الان، ۱ کار از ساعت ۱۴");
+
+    const beforeStart = Date.parse("2026-10-09T06:25:00.000Z");
+    const hiddenDue = template("پنهان", "10:20", "INDIVIDUAL", "10:00");
+    occurrence({
+      templateId: hiddenDue.id,
+      userId: staff.id,
+      departmentId: cafe.id,
+      dueAt: dueAtTehranMs(DAY, "10:20"),
+    });
+    expect(
+      previewTaskNotices({ type: "task.due_soon", userId: staff.id, now: beforeStart }).some(
+        (item) => item.willSend && item.title === "پنهان",
+      ),
+    ).toBe(false);
+    const visibleSoon = Date.parse("2026-10-09T06:35:00.000Z");
+    expect(
+      previewTaskNotices({ type: "task.due_soon", userId: staff.id, now: visibleSoon }).some(
+        (item) => item.willSend && item.title === "پنهان",
+      ),
+    ).toBe(true);
+
+    const hiddenOverdue = template("دیر", "10:00", "INDIVIDUAL", "11:00");
+    occurrence({
+      templateId: hiddenOverdue.id,
+      userId: staff.id,
+      departmentId: cafe.id,
+      dueAt: dueAtTehranMs(DAY, "10:00"),
+    });
+    const overdueEarly = dueAtTehranMs(DAY, "10:00") + 15 * 60 * 1000;
+    expect(
+      previewTaskNotices({ type: "task.overdue", userId: staff.id, now: overdueEarly }).some(
+        (item) => item.willSend && item.title === "دیر",
+      ),
+    ).toBe(false);
+    const overdueVisible = dueAtTehranMs(DAY, "11:00") + 5 * 60 * 1000;
+    expect(
+      previewTaskNotices({ type: "task.overdue", userId: staff.id, now: overdueVisible }).some(
+        (item) => item.willSend && item.title === "دیر",
+      ),
+    ).toBe(true);
+
+    expect(previewTaskNotices({ type: "task.visible", userId: staff.id, now: AT_9 })[0]?.willSend).toBe(
+      false,
+    );
+    db.insert(schema.notificationPreferences)
+      .values({ userId: staff.id, type: "task.visible", push: true })
+      .run();
+    const opened = previewTaskNotices({
+      type: "task.visible",
+      userId: staff.id,
+      now: dueAtTehranMs(DAY, "14:00") + 5 * 60 * 1000,
+    });
+    expect(opened.some((item) => item.willSend && item.body === "از الان قابل انجام است")).toBe(true);
+    runTaskNotificationJob(dueAtTehranMs(DAY, "14:00") + 5 * 60 * 1000);
+    runTaskNotificationJob(dueAtTehranMs(DAY, "14:00") + 6 * 60 * 1000);
+    expect(
+      db.select().from(schema.notifications).where(eq(schema.notifications.type, "task.visible")).all(),
+    ).toHaveLength(1);
   });
 });

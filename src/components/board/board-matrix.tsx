@@ -11,6 +11,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import type { OccurrenceStatus } from "@/db/schema";
 import { fa } from "@/lib/i18n/fa";
+import { occurrenceStatusLabel } from "@/lib/reports/status-label";
 import { cn, toFaDigits } from "@/lib/utils";
 import type { BoardPayload } from "@/server/queries/board";
 
@@ -109,6 +110,7 @@ export function BoardMatrix({ data, canEdit }: Props) {
                                 ? cell.completedByName
                                 : null
                             }
+                            notStarted={cell.notStarted}
                           />
                         ) : (
                           <span className="text-muted-foreground text-xs">—</span>
@@ -168,6 +170,7 @@ export function BoardMatrix({ data, canEdit }: Props) {
                       {mine.map(({ task, cell }) => {
                         const status = cell!.status as OccurrenceStatus;
                         const Icon = STATUS_ICONS[status];
+                        const statusLabel = occurrenceStatusLabel(status, cell!.notStarted);
                         return (
                           <li
                             key={task.id}
@@ -185,7 +188,7 @@ export function BoardMatrix({ data, canEdit }: Props) {
                                 )}
                               >
                                 <Icon className="size-3" aria-hidden />
-                                {STATUS_COLORS[status].label}
+                                {statusLabel}
                               </p>
                             </div>
                             <StatusCell
@@ -202,6 +205,7 @@ export function BoardMatrix({ data, canEdit }: Props) {
                                   ? cell!.completedByName
                                   : null
                               }
+                              notStarted={cell!.notStarted}
                             />
                           </li>
                         );

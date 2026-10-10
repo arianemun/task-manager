@@ -11,6 +11,7 @@ const TYPES = [
   "task.daily_digest",
   "task.due_soon",
   "task.overdue",
+  "task.visible",
   "task.manager_summary",
 ] as const;
 

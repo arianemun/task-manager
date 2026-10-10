@@ -1,4 +1,5 @@
 import { compareGDate, type GDate } from "@/lib/dates";
+import { isOccurrenceNotStarted } from "@/lib/tasks/start-time";
 
 /**
  * قاعده درصد (منبع واحد برای /me/report، داشبورد، /admin/reports و پروفایل پرسنل):
@@ -7,7 +8,8 @@ import { compareGDate, type GDate } from "@/lib/dates";
  * - NOT_DONE و MISSED و OVERDUE فقط در مخرج. OVERDUE وضعیت ذخیره‌شده نیست:
  *   occurrence با status=PENDING که due_at آن گذشته باشد، در محاسبه OVERDUE است
  *   و در دیتابیس PENDING می‌ماند تا پرسنل هنوز بتواند ثبت کند.
- * - PENDING که مهلتش نرسیده «در جریان» است: از صورت و مخرج حذف، جدا شمرده می‌شود.
+ * - PENDING که مهلتش نرسیده، و PENDING که ساعت شروع امروزش نرسیده، «در جریان» است:
+ *   از صورت و مخرج حذف، جدا شمرده می‌شود. «هنوز شروع نشده» وضعیت ذخیره‌شده نیست.
  * - EXCUSED و DONE_BY_PEER از صورت و مخرج حذف (نه امتیاز، نه جریمه).
  * - مخرج صفر → null، نه ۰ ساختگی و نه ۱۰۰.
  * - اگر بازه امروز را شامل شود، دوره جاری هفتگی/ماهانه با period_end بعد از بازه
@@ -21,6 +23,7 @@ export type ClassifiedOccurrence = {
   periodKey: string;
   userId: number | null;
   completedByUserId: number | null;
+  startTime?: string | null;
 };
 
 export type RateContext = {
@@ -77,6 +80,17 @@ export function classifyOccurrence(
   }
 
   if (row.status === "PENDING") {
+    if (
+      isOccurrenceNotStarted({
+        status: row.status,
+        startTime: row.startTime,
+        periodStart: row.periodStart,
+        periodEnd: row.periodEnd,
+        now: ctx.nowMs,
+      })
+    ) {
+      return { kind: "in_progress" };
+    }
     if (deadlinePassed(row, ctx.nowMs)) {
       return { kind: "counted", status: "OVERDUE" };
     }

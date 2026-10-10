@@ -72,6 +72,7 @@ export const fa = {
     startTime: "ساعت شروع",
     startTimeHint:
       "اختیاری و به وقت تهران. با رسیدن این ساعت کار برای پرسنل دیده می‌شود. در کار هفتگی و ماهانه هر روز همین ساعت ملاک است. اگر خالی باشد، از ابتدای روز دیده می‌شود.",
+    notStarted: "هنوز شروع نشده",
   },
 
   me: {
@@ -174,6 +175,7 @@ export const fa = {
       "task.daily_digest": "خلاصهٔ امروز",
       "task.due_soon": "نزدیک شدن مهلت",
       "task.overdue": "گذشتن مهلت",
+      "task.visible": "شروع کار ساعت‌دار",
       "task.manager_summary": "خلاصهٔ مدیر",
       "system.data_check_failed": "خطای سلامت داده",
     },

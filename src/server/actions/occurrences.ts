@@ -10,6 +10,7 @@ import { requireUser } from "@/lib/auth/user";
 import { compareGDate, todayTehran } from "@/lib/dates";
 import { statusFromCompletion } from "@/lib/recurrence";
 import { isStaffResponseLocked } from "@/lib/tasks/response-lock";
+import { responseBlockedBeforeStart } from "@/lib/tasks/start-time";
 import { saveOccurrenceAttachment } from "@/lib/uploads/attachment";
 import { getNotDoneReasonsForDepartments } from "@/lib/settings/not-done-reasons";
 import { recordGroupOutcome } from "@/server/services/group-completion";
@@ -93,6 +94,9 @@ export async function submitOccurrenceAction(
       .where(eq(taskTemplates.id, occ.templateId))
       .get();
     if (!template) return { ok: false, error: "قالب یافت نشد" };
+
+    const notStarted = responseBlockedBeforeStart(template.startTime);
+    if (notStarted) return { ok: false, error: notStarted };
 
     if (occ.completedByUserId && occ.completedByUserId !== actor.id) {
       const person = db

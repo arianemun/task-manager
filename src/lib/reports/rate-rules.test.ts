@@ -36,6 +36,21 @@ describe("باگ ۲ — PENDING و مخرج صفر", () => {
     expect(overdue).toEqual({ kind: "counted", status: "OVERDUE" });
     expect(waiting).toEqual({ kind: "in_progress" });
 
+    const hidden = classifyOccurrence(
+      {
+        status: "PENDING",
+        dueAtMs: now - 60_000,
+        periodStart: today,
+        periodEnd: today,
+        periodKey: "D:3",
+        userId: 1,
+        completedByUserId: null,
+        startTime: "23:00",
+      },
+      ctx,
+    );
+    expect(hidden).toEqual({ kind: "in_progress" });
+
     const rates = ratesFromCounts({ OVERDUE: 1, PENDING: 1, DONE: 0 });
     expect(rates.countable).toBe(1);
     expect(rates.inProgress).toBe(1);

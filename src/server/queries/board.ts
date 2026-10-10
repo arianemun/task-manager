@@ -16,6 +16,7 @@ import {
   startOfJalaliWeek,
   type GDate,
 } from "@/lib/dates";
+import { isOccurrenceNotStarted } from "@/lib/tasks/start-time";
 
 export type BoardCell = {
   occurrenceId: number;
@@ -29,6 +30,8 @@ export type BoardCell = {
   periodEnd: string;
   completedByUserId: number | null;
   completedByName: string | null;
+  /** PENDING که ساعت شروع امروزش نرسیده. وضعیت ذخیره‌شده همان PENDING است. */
+  notStarted: boolean;
 };
 
 export type BoardPayload = {
@@ -102,7 +105,9 @@ function buildSummary(
   const done = counted.filter(
     (c) => c.status === "DONE" || c.status === "DONE_LATE",
   ).length;
-  const unanswered = ownCells.filter((c) => c.status === "PENDING").length;
+  const unanswered = ownCells.filter(
+    (c) => c.status === "PENDING" && !c.notStarted,
+  ).length;
 
   let silentStaff: Array<{ id: number; fullName: string }> = [];
   if (forDay) {
@@ -110,7 +115,9 @@ function buildSummary(
       cells.filter((c) => c.status !== "PENDING").map((c) => c.userId),
     );
     const hasPending = new Set(
-      cells.filter((c) => c.status === "PENDING").map((c) => c.userId),
+      cells
+        .filter((c) => c.status === "PENDING" && !c.notStarted)
+        .map((c) => c.userId),
     );
     silentStaff = staff.filter(
       (s) => hasPending.has(s.id) && !responded.has(s.id),
@@ -158,6 +165,7 @@ export function loadBoardDay(
       completedByUserId: taskOccurrences.completedByUserId,
       taskTitle: taskTemplates.title,
       recurrenceType: taskTemplates.recurrenceType,
+      startTime: taskTemplates.startTime,
     })
     .from(taskOccurrences)
     .innerJoin(taskTemplates, eq(taskOccurrences.templateId, taskTemplates.id))
@@ -193,6 +201,12 @@ export function loadBoardDay(
       periodEnd: c.periodEnd,
       completedByUserId: c.completedByUserId,
       completedByName: c.completedByName,
+      notStarted: isOccurrenceNotStarted({
+        status: c.status,
+        startTime: c.startTime,
+        periodStart: c.periodStart,
+        periodEnd: c.periodEnd,
+      }),
     };
   });
 
@@ -243,6 +257,7 @@ export function loadBoardPeriod(
       completedByUserId: taskOccurrences.completedByUserId,
       taskTitle: taskTemplates.title,
       recurrenceType: taskTemplates.recurrenceType,
+      startTime: taskTemplates.startTime,
     })
     .from(taskOccurrences)
     .innerJoin(taskTemplates, eq(taskOccurrences.templateId, taskTemplates.id))
@@ -278,6 +293,12 @@ export function loadBoardPeriod(
       periodEnd: c.periodEnd,
       completedByUserId: c.completedByUserId,
       completedByName: c.completedByName,
+      notStarted: isOccurrenceNotStarted({
+        status: c.status,
+        startTime: c.startTime,
+        periodStart: c.periodStart,
+        periodEnd: c.periodEnd,
+      }),
     };
   });
 

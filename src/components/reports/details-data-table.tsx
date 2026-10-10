@@ -6,7 +6,7 @@ import {
 } from "@/components/data-table/data-table";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { Badge } from "@/components/ui/badge";
-import { fa } from "@/lib/i18n/fa";
+import { occurrenceStatusLabel } from "@/lib/reports/status-label";
 import { toJalali, type GDate } from "@/lib/dates";
 import { toFaDigits } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ export type DetailRow = {
   title: string;
   periodEnd: string | Date;
   status: string;
+  notStarted?: boolean;
   reasonCode: string | null;
   reasonLabel?: string | null;
   note: string | null;
@@ -50,7 +51,7 @@ const columns: DataTableColumnDef<DetailRow>[] = [
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="font-medium">{row.fullName}</span>
           <Badge variant="outline">
-            {fa.status[row.status as keyof typeof fa.status] ?? row.status}
+            {occurrenceStatusLabel(row.status, row.notStarted)}
           </Badge>
         </div>
         <p>{row.title}</p>
@@ -85,9 +86,7 @@ const columns: DataTableColumnDef<DetailRow>[] = [
     meta: { label: "وضعیت" },
     header: "وضعیت",
     cell: ({ row }) => {
-      const status =
-        fa.status[row.original.status as keyof typeof fa.status] ??
-        row.original.status;
+      const status = occurrenceStatusLabel(row.original.status, row.original.notStarted);
       const by = row.original.completedByName;
       if (by && by !== row.original.fullName) {
         return `${status} · ${by}`;

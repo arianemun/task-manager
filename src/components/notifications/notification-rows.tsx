@@ -5,6 +5,7 @@ import {
   AlarmClock,
   AlertTriangle,
   Bell,
+  Eye,
   CalendarDays,
   ClipboardList,
   Clock,
@@ -28,7 +29,9 @@ function TypeIcon({ type }: { type: string }) {
           ? Clock
           : type === "task.overdue"
             ? AlarmClock
-            : type === "task.manager_summary"
+            : type === "task.visible"
+              ? Eye
+              : type === "task.manager_summary"
               ? PieChart
               : type.startsWith("chat.")
                 ? MessageSquare
