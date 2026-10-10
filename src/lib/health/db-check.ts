@@ -57,7 +57,8 @@ export type HealthCheckId =
   | "media_jobs"
   | "chat_orphan_attachment"
   | "chat_disk_mismatch"
-  | "chat_inactive_member";
+  | "chat_inactive_member"
+  | "task_priority";
 
 export type HealthFinding = {
   id: HealthCheckId;
@@ -703,6 +704,27 @@ function mediaJobsAttention(database: Db) {
   };
 }
 
+/** اولویت کار باید یکی از چهار خانهٔ آیزنهاور باشد، نه مقدار قدیمی کم/متوسط/زیاد. */
+function unknownTaskPriority(database: Db) {
+  const where = sql`${taskTemplates.priority} not in ('DO', 'SCHEDULE', 'DELEGATE', 'ELIMINATE')`;
+  const countRow = database
+    .select({ n: sql<number>`count(*)` })
+    .from(taskTemplates)
+    .where(where)
+    .get();
+  const sample = database
+    .select({ id: taskTemplates.id })
+    .from(taskTemplates)
+    .where(where)
+    .orderBy(asc(taskTemplates.id))
+    .limit(SAMPLE_LIMIT)
+    .all();
+  return {
+    count: Number(countRow?.n ?? 0),
+    sampleIds: sample.map((row) => row.id),
+  };
+}
+
 const RUNNERS: CheckRunner[] = [
   {
     id: "foreign_close",
@@ -779,6 +801,11 @@ const RUNNERS: CheckRunner[] = [
     id: "chat_inactive_member",
     title: "عضو فعال گفتگو که کاربرش غیرفعال یا حذف شده",
     run: chatInactiveMembers,
+  },
+  {
+    id: "task_priority",
+    title: "اولویت کار خارج از چهار خانهٔ آیزنهاور",
+    run: unknownTaskPriority,
   },
 ];
 

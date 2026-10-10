@@ -29,6 +29,7 @@ type Props = {
 export function EisenhowerMatrix({ value, onChange, disabled = false }: Props) {
   const boardRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
+  const movedRef = useRef(false);
   const [dragPoint, setDragPoint] = useState<{ x: number; y: number } | null>(null);
   const [hover, setHover] = useState<Priority | null>(null);
   const shown = hover ?? value;
@@ -54,6 +55,7 @@ export function EisenhowerMatrix({ value, onChange, disabled = false }: Props) {
     const next = read(event);
     if (!next) return;
     draggingRef.current = true;
+    movedRef.current = false;
     event.currentTarget.setPointerCapture(event.pointerId);
     setDragPoint(next.point);
     setHover(next.quadrant);
@@ -63,6 +65,7 @@ export function EisenhowerMatrix({ value, onChange, disabled = false }: Props) {
     if (!draggingRef.current) return;
     const next = read(event);
     if (!next) return;
+    movedRef.current = true;
     setDragPoint(next.point);
     setHover(next.quadrant);
   }
@@ -83,10 +86,10 @@ export function EisenhowerMatrix({ value, onChange, disabled = false }: Props) {
         <div
           ref={boardRef}
           role="radiogroup"
-          aria-label={fa.auditFields.priority}
+          aria-label={fa.eisenhower.matrixLabel}
           tabIndex={disabled ? -1 : 0}
           className={cn(
-            "relative grid aspect-[5/3] w-full grid-cols-2 grid-rows-2 overflow-hidden rounded-xl border select-none",
+            "relative grid aspect-[5/3] w-full touch-none grid-cols-2 grid-rows-2 overflow-hidden rounded-xl border select-none",
             disabled ? "cursor-not-allowed opacity-60" : "cursor-grab active:cursor-grabbing",
           )}
           style={{ touchAction: "none" }}
@@ -107,19 +110,27 @@ export function EisenhowerMatrix({ value, onChange, disabled = false }: Props) {
           }}
         >
           {CELLS.map((cell) => (
-            <div
+            <button
               key={cell.id}
+              type="button"
               role="radio"
               aria-checked={shown === cell.id}
+              aria-label={`${fa.eisenhower.cells[cell.id].title}، ${fa.eisenhower.cells[cell.id].detail}`}
+              disabled={disabled}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 border p-3 text-center",
+                "flex touch-none flex-col items-center justify-center gap-1 border p-3 text-center",
                 cell.className,
                 shown === cell.id && "ring-primary ring-2 ring-inset",
               )}
+              style={{ touchAction: "none" }}
+              onClick={() => {
+                if (movedRef.current) return;
+                onChange(cell.id);
+              }}
             >
               <span className="text-sm font-semibold">{fa.eisenhower.cells[cell.id].title}</span>
               <span className="text-[11px] opacity-80">{fa.eisenhower.cells[cell.id].detail}</span>
-            </div>
+            </button>
           ))}
           <span
             aria-hidden

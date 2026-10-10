@@ -186,12 +186,12 @@ export function TaskCard({ occ, reasons, highlighted = false }: Props) {
             ) : null}
             {occ.priority === "DO" ? (
               <Badge variant="danger" className="font-semibold">
-                {fa.priority.DO}
+                {fa.me.badgeUrgent}
               </Badge>
             ) : null}
-            {occ.priority === "DELEGATE" ? (
-              <Badge variant="warning" className="font-semibold">
-                {fa.priority.DELEGATE}
+            {occ.priority === "SCHEDULE" ? (
+              <Badge variant="secondary" className="font-semibold">
+                {fa.me.badgeImportant}
               </Badge>
             ) : null}
             {!responded ? (

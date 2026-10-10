@@ -79,6 +79,8 @@ export const fa = {
     archive: "بایگانی",
     archiveHint: "کارهایی که انجام‌شدن یا انجام‌نشدنشان ثبت شده",
     noneOpen: "کار بازی نمانده",
+    badgeUrgent: "فوری",
+    badgeImportant: "مهم",
   },
 
   nav: {
@@ -229,17 +231,18 @@ export const fa = {
   },
 
   priority: {
-    DO: "انجام فوری",
+    DO: "انجام شود",
     SCHEDULE: "برنامه‌ریزی",
-    DELEGATE: "واگذاری",
-    ELIMINATE: "کم‌اهمیت",
+    DELEGATE: "واگذار شود",
+    ELIMINATE: "حذف شود",
   },
 
   eisenhower: {
     important: "مهم",
     urgent: "فوری",
     notUrgent: "غیرفوری",
-    hint: "نقطه را با ماوس بکشید و در خانهٔ مناسب رها کنید. با کلیک هم همان خانه انتخاب می‌شود.",
+    matrixLabel: "ماتریس اولویت آیزنهاور",
+    hint: "نقطه را بکشید یا روی خانه بزنید. با کلیدهای جهت هم خانه عوض می‌شود.",
     cells: {
       DO: { title: "انجام شود", detail: "فوری و مهم" },
       SCHEDULE: { title: "برنامه‌ریزی", detail: "مهم، غیرفوری" },

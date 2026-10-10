@@ -6,6 +6,7 @@ import {
 } from "@/components/data-table/data-table";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { Badge } from "@/components/ui/badge";
+import { fa } from "@/lib/i18n/fa";
 import { occurrenceStatusLabel } from "@/lib/reports/status-label";
 import { toJalali, type GDate } from "@/lib/dates";
 import { toFaDigits } from "@/lib/utils";
@@ -17,6 +18,7 @@ export type DetailRow = {
   periodEnd: string | Date;
   status: string;
   notStarted?: boolean;
+  priority?: string;
   reasonCode: string | null;
   reasonLabel?: string | null;
   note: string | null;
@@ -55,6 +57,11 @@ const columns: DataTableColumnDef<DetailRow>[] = [
           </Badge>
         </div>
         <p>{row.title}</p>
+        {row.priority ? (
+          <p className="text-muted-foreground text-xs">
+            {fa.priority[row.priority as keyof typeof fa.priority] ?? row.priority}
+          </p>
+        ) : null}
         <p className="text-muted-foreground text-xs tabular-nums">
           پایان: {formatPeriodEnd(row.periodEnd)}
         </p>
@@ -74,6 +81,16 @@ const columns: DataTableColumnDef<DetailRow>[] = [
     meta: { label: "کار" },
     header: "کار",
     cell: ({ row }) => row.original.title,
+  },
+  {
+    id: "priority",
+    meta: { label: "اولویت" },
+    header: "اولویت",
+    cell: ({ row }) =>
+      row.original.priority
+        ? (fa.priority[row.original.priority as keyof typeof fa.priority] ??
+          row.original.priority)
+        : "—",
   },
   {
     id: "periodEnd",

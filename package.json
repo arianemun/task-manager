@@ -25,7 +25,7 @@
     "cron:generate": "tsx scripts/cron-generate.ts",
     "cron:close": "tsx scripts/cron-close.ts",
     "pretest": "tsx scripts/changelog-json.ts",
-    "test": "vitest run",
+    "test": "NODE_ENV=test vitest run",
     "release": "tsx scripts/release.ts",
     "test:watch": "vitest",
     "build:standalone": "node scripts/copy-standalone.mjs"

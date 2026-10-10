@@ -4,6 +4,7 @@ import { authErrorResponse } from "@/lib/auth/http";
 import { requireUser } from "@/lib/auth/user";
 import { toJalali } from "@/lib/dates";
 import { parseReportFilters } from "@/lib/reports";
+import { fa } from "@/lib/i18n/fa";
 import { occurrenceStatusLabel } from "@/lib/reports/status-label";
 import {
   aggregateByStaff,
@@ -111,6 +112,7 @@ export async function GET(request: Request) {
     detailSheet.columns = [
       { header: "پرسنل", key: "name", width: 22 },
       { header: "کار", key: "title", width: 28 },
+      { header: "اولویت", key: "priority", width: 16 },
       { header: "پایان دوره (شمسی)", key: "end", width: 16 },
       { header: "وضعیت", key: "status", width: 18 },
       { header: "ثبت‌کننده", key: "by", width: 22 },
@@ -123,6 +125,7 @@ export async function GET(request: Request) {
       detailSheet.addRow({
         name: r.fullName,
         title: r.title,
+        priority: fa.priority[r.priority as keyof typeof fa.priority] ?? r.priority,
         end: toJalali(r.periodEnd).jDate,
         status: occurrenceStatusLabel(r.status, r.notStarted),
         by:

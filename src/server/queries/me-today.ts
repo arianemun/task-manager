@@ -55,10 +55,11 @@ export type MeOccurrence = {
 };
 
 function sortOcc(a: MeOccurrence, b: MeOccurrence): number {
+  const rank = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+  if (rank !== 0) return rank;
   const da = a.dueAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
   const db_ = b.dueAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
-  if (da !== db_) return da - db_;
-  return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+  return da - db_;
 }
 
 export function loadMeToday(userId: number) {

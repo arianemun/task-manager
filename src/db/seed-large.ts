@@ -113,7 +113,7 @@ async function main() {
         .values({
           title,
           categoryId: cats[i % cats.length]!.id,
-          priority: (["ELIMINATE", "SCHEDULE", "DO"] as const)[i % 3]!,
+          priority: (["DO", "SCHEDULE", "DELEGATE", "ELIMINATE"] as const)[i % 4]!,
           recurrenceType: "DAILY",
           recurrenceConfig: { interval: 1 },
           startDate: start,

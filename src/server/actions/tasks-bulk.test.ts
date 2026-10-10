@@ -102,7 +102,7 @@ describe("ساخت چند کار و diff لاگ", () => {
     form.set("startDate", todayTehran());
     form.set("recurrenceType", "DAILY");
     form.set("recurrenceConfig", JSON.stringify({ interval: 1, excludeWeekdays: [] }));
-    form.set("priority", "MEDIUM");
+    form.set("priority", "DO");
     form.set("completionMode", "INDIVIDUAL");
     form.set("skipHolidays", "true");
     form.set("userIds", "[]");
@@ -117,6 +117,7 @@ describe("ساخت چند کار و diff لاگ", () => {
     expect(rows.map((row) => row.title).sort()).toEqual(
       ["جارو", "شستشو", "نظافت", "پولیش"].sort(),
     );
+    expect(rows.every((row) => row.priority === "DO")).toBe(true);
 
     const bulk = db
       .select()
@@ -143,7 +144,7 @@ describe("ساخت چند کار و diff لاگ", () => {
     update.set("startDate", todayTehran());
     update.set("recurrenceType", "DAILY");
     update.set("recurrenceConfig", JSON.stringify({ interval: 1, excludeWeekdays: [] }));
-    update.set("priority", "MEDIUM");
+    update.set("priority", "ELIMINATE");
     update.set("completionMode", "INDIVIDUAL");
     update.set("skipHolidays", "true");
     update.set("userIds", JSON.stringify([staff.id]));

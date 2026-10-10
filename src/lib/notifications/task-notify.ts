@@ -226,7 +226,7 @@ export function recordTaskAssigned(input: {
   });
 }
 
-function loadRows(today: GDate, now = Date.now()): Row[] {
+function loadRows(today: GDate): Row[] {
   return db
     .select({
       occurrenceId: taskOccurrences.id,
@@ -625,7 +625,7 @@ export function previewTaskNotices(input: {
   const now = input.now ?? Date.now();
   const today = tehranDateFromMs(now);
   const settings = loadTaskNotifySettings();
-  const rows = loadRows(today, now);
+  const rows = loadRows(today);
   const person = db
     .select({ role: users.role, fullName: users.fullName })
     .from(users)
@@ -828,7 +828,7 @@ export function commitTaskNotices(plans: TaskNoticePlan[], now = Date.now()): nu
 export function runTaskNotificationJob(now = Date.now()): number {
   const today = tehranDateFromMs(now);
   const settings = loadTaskNotifySettings();
-  const rows = loadRows(today, now);
+  const rows = loadRows(today);
   const holiday = isHoliday(today);
   const leaves = onLeaveIds(today);
   const userIds = [...new Set(rows.map((row) => row.userId))];
